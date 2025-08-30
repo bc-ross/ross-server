@@ -434,9 +434,20 @@
     /* =========================
        LEFT: Autocomplete select
        ========================= */
-    const COURSES = [
-       "BA Accounting ","BA Architecture ","BA Art ","BA Art Education ","BS Astronomy ","BA Athletic Health Care ","BA Biochemistry ","BS Biochemistry ","BA Biology ","BA Biology ","BS Biology ","BS Chemical Engineering ","BA Chemistry ","BA Chemistry ","BS Chemistry ","BS Civil Engineering ","BA Classics ","BA Computer Science ","BS Computer Science ","BA Criminology ","BA Economics ","BS Electrical Engineering ","BA Elementary Education ","BS Engineering Physics ","BA English ","BA English ","BA English ","BA and Theatre Arts ","BA Finance ","BA Foreign Languages ","BA French ","BA French and Secondary Education ","BA Graphic Design ","BA History ","BA International Business ","BA International Studies ","BA Journalism and Mass Communications ","BA Management ","BA Marketing ","BA Mathematics ","BA Mathematics ","BS Mechanical Engineering ","BA Music ","BME Music Education ","BSN Nursing ","BA Philosophy ","BA Philosophy ","BA Physics ","BA Physics ","BS Physics ","BA Politics and Government ","BA Psychology ","BA Secondary Education ","BA Social Science ","BA Sociology ","BA Spanish ","BA Spanish and Secondary Education ","BA Special Education ","BA Strength and Conditioning ","BA Theatre Arts ","BA Theatre Arts Management ","BA Theology ","BA Art ","BA Evangelization & Catechesis ","BA Evangelization & Catechesis ","BA Exercise Science ","BA Exercise Science ","BA Exercise Science ","BA Exercise Science ","BA Finance ","BA Music ","BA Music ","BA Politics and Government ","BA Theology "
-    ];
+
+       let COURSES = [];
+
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const res = await fetch('/api/majors');
+    const data = await res.json();
+    COURSES = data.items || [];
+  } catch (err) {
+    console.error('Failed to load majors', err);
+  }
+});
+
+
     const input        = document.getElementById('searchInput');
     const dropdown     = document.getElementById('dropdown');
     const dropdownList = document.getElementById('dropdownList');

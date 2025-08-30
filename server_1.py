@@ -11,6 +11,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Union
 
+# -----------------------------
+# INPUT RUST FUNCTIONS
+# -----------------------------
+
+
 
 # -----------------------------
 # Logging
@@ -92,8 +97,6 @@ class ScheduleResponse(BaseModel):
     # New: object whose keys are "semester-1", "semester-2", ... each with rows like ["MATH","101",3,"Calculus I"]
     semesters: Optional[Dict[str, List[List[Union[str, int]]]]] = None
     schedule_id: Optional[str] = None
-
-
 
 # -----------------------------
 # Health check
@@ -186,6 +189,17 @@ async def make_schedule(req: ScheduleRequest, request: Request) -> ScheduleRespo
         schedule_id=schedule_id,
     )
 
+class MajorListResponse(BaseModel):
+    items: List[str]
+
+def list_programs():
+    return (["BA Physics", "BA Chemistry"])
+
+@app.get("/api/majors", response_model=MajorListResponse)
+def get_majors():
+    # assume Rust function returns a Python list of strings
+    majors = list_programs()
+    return MajorListResponse(items=majors)
 
 
 # -----------------------------
