@@ -710,115 +710,113 @@
     /* ============================
        SCHEDULE RENDERER (no Notes col)
        ============================ */
-    function renderSchedule(semesters) {
-      const wrap = document.getElementById('scheduleWrap');
-      const container = document.getElementById('schedule');
-      container.innerHTML = '';
+function renderSchedule(semesters) {
+  const wrap = document.getElementById('scheduleWrap');
+  const container = document.getElementById('schedule');
+  container.innerHTML = '';
 
-      if (!semesters || typeof semesters !== 'object') {
-        wrap.style.display = 'none';
-        return;
+  if (!semesters || typeof semesters !== 'object') {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  const entries = Object.entries(semesters)
+    .filter(([_, v]) => Array.isArray(v))
+    .map(([key, rows]) => {
+      const num = (String(key).match(/\d+/) || [9999])[0];
+      return { key, num: parseInt(num, 10), rows };
+    })
+    .sort((a, b) => a.num - b.num);
+
+  if (!entries.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  for (const { key, rows } of entries) {
+    const term = document.createElement('div');
+    term.className = 'schedule-term';
+
+    const h = document.createElement('h4');
+    h.textContent = prettifyTermName(key);
+    term.appendChild(h);
+
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    // Two columns only
+    thead.innerHTML = `<tr>
+      <th>Course</th>
+      <th>Credits</th>
+    </tr>`;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    let termCredits = 0;
+
+    rows.forEach((row) => {
+      let subject = '', code = '', credits = '';
+
+      if (Array.isArray(row)) {
+        if (row.length >= 3 && typeof row[0] === 'string' && typeof row[1] === 'string') {
+          subject = row[0];
+          code = row[1];
+          credits = row[2];
+        } else {
+          const first = String(row[0] ?? '');
+          const parts = first.split(/[\s-]+/);
+          subject = parts[0] || '';
+          code = parts.slice(1).join(' ') || '';
+          credits = row[1] ?? '';
+        }
+      } else if (row && typeof row === 'object') {
+        subject = row.subject || row.dept || '';
+        code    = row.code || row.number || '';
+        credits = row.credits ?? row.credit_hours ?? '';
       }
 
-      const entries = Object.entries(semesters)
-        .filter(([_, v]) => Array.isArray(v))
-        .map(([key, rows]) => {
-          const num = (String(key).match(/\d+/) || [9999])[0];
-          return { key, num: parseInt(num, 10), rows };
-        })
-        .sort((a, b) => a.num - b.num);
+      const credNum = (credits !== '' && credits != null && !Number.isNaN(+credits)) ? +credits : '';
+      if (credNum !== '' && Number.isFinite(credNum)) termCredits += credNum;
 
-      if (!entries.length) {
-        wrap.style.display = 'none';
-        return;
-      }
+      const courseCode = [subject, code].filter(Boolean).join('-');
 
-      for (const { key, rows } of entries) {
-        const term = document.createElement('div');
-        term.className = 'schedule-term';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(courseCode)}</td>
+        <td>${credNum !== '' ? credNum : ''}</td>
+      `;
+      tbody.appendChild(tr);
+    });
 
-        const h = document.createElement('h4');
-        h.textContent = prettifyTermName(key);
-        term.appendChild(h);
+    table.appendChild(tbody);
+    term.appendChild(table);
 
-        const table = document.createElement('table');
-        const thead = document.createElement('thead');
-        thead.innerHTML = `<tr>
-          <th style="width:60%">Course</th>
-          <th style="width:20%">Code</th>
-          <th style="width:20%">Credits</th>
-        </tr>`;
-        table.appendChild(thead);
+    const summary = document.createElement('div');
+    summary.className = 'schedule-summary';
+    summary.textContent = `Semester Credits: ${termCredits}`;
+    term.appendChild(summary);
 
-        const tbody = document.createElement('tbody');
-        let termCredits = 0;
+    container.appendChild(term);
+  }
 
-        rows.forEach((row) => {
-          // Accept a few shapes:
-          // ["MATH","101",3,"Calculus I"]  OR  ["MATH-101", 3, "Calculus I"]
-          // {subject:"MATH", code:"101", credits:3, title:"Calculus I"}
-          let subject = '', code = '', credits = '', title = '';
+  wrap.style.display = 'block';
+}
 
-          if (Array.isArray(row)) {
-            if (row.length >= 3 && typeof row[0] === 'string' && typeof row[1] === 'string') {
-              subject = row[0]; code = row[1]; credits = row[2]; title = row[3] || '';
-            } else {
-              const first = String(row[0] ?? '');
-              const parts = first.split(/[\s-]+/);
-              subject = parts[0] || '';
-              code = parts.slice(1).join(' ') || '';
-              credits = row[1] ?? '';
-              title = row[2] ?? '';
-            }
-          } else if (row && typeof row === 'object') {
-            subject = row.subject || row.dept || '';
-            code    = row.code || row.number || '';
-            credits = row.credits ?? row.credit_hours ?? '';
-            title   = row.title || row.name || '';
-          }
+function prettifyTermName(key) {
+  return String(key)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
 
-          const course = (title || [subject, code].filter(Boolean).join(' ')).trim();
-          const credNum = (credits !== '' && credits != null && !Number.isNaN(+credits)) ? +credits : '';
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'","&#39;");
+}
 
-          if (credNum !== '' && Number.isFinite(credNum)) termCredits += credNum;
 
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${escapeHtml(course)}</td>
-            <td>${escapeHtml(code)}</td>
-            <td>${credNum !== '' ? credNum : ''}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-
-        table.appendChild(tbody);
-        term.appendChild(table);
-
-        const summary = document.createElement('div');
-        summary.className = 'schedule-summary';
-        summary.textContent = `Estimated term credits: ${termCredits}`;
-        term.appendChild(summary);
-
-        container.appendChild(term);
-      }
-
-      wrap.style.display = 'block';
-    }
-
-    function prettifyTermName(key) {
-      return String(key)
-        .replace(/[_-]+/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
-    }
-
-    function escapeHtml(s) {
-      return String(s ?? '')
-        .replaceAll('&','&amp;')
-        .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replaceAll('"','&quot;')
-        .replaceAll("'","&#39;");
-    }
   </script>
 </body>
 </html>
