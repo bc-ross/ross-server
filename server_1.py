@@ -202,5 +202,5 @@ async def unhandled_exception_handler(_: Request, exc: Exception):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("testing_schedule:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("server_1:app", host="127.0.0.1", port=8000, reload=True)
 
