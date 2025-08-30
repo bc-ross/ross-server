@@ -167,7 +167,7 @@ def build_mock_semesters() -> Dict[str, List[List[Union[str, int]]]]:
 # -----------------------------
 # Core endpoint
 # -----------------------------
-@app.post("/api", response_model=ScheduleResponse, summary="Create schedule")
+@app.post("/api/schedule", response_model=ScheduleResponse, summary="Create schedule")
 async def make_schedule(req: ScheduleRequest, request: Request) -> ScheduleResponse:
     client = request.client.host if request.client else "unknown"
     log.info("POST /api from %s | majors=%s | courses=%s", client, req.majors, req.courses_taken)
