@@ -222,8 +222,12 @@ btn.addEventListener("click", async () => {
       Object.keys(data).some((k) => /^semester[- _]?\d+$/i.test(k))
         ? data
         : null);
-
-    if (!semesters) {
+      
+      // -----------------------------------------------
+      // FIND A BETTER WAY TO DO THIS
+      // -----------------------------------------------
+      
+      if (!semesters) {
       console.warn(
         "No semesters in response; using mock so the table renders."
       );
@@ -321,8 +325,8 @@ overlay.addEventListener("click", (e) => {
 });
 
 /* ============================
-       SCHEDULE RENDERER (no Notes col)
-       ============================ */
+SCHEDULE RENDERER (no Notes col)
+============================ */
 function renderSchedule(semesters) {
   const wrap = document.getElementById("scheduleWrap");
   const container = document.getElementById("schedule");
@@ -356,7 +360,6 @@ function renderSchedule(semesters) {
 
     const table = document.createElement("table");
     const thead = document.createElement("thead");
-    // Two columns only
     thead.innerHTML = `<tr>
       <th>Course</th>
       <th>Credits</th>
@@ -367,44 +370,22 @@ function renderSchedule(semesters) {
     let termCredits = 0;
 
     rows.forEach((row) => {
-      let subject = "",
-        code = "",
-        credits = "";
+      // Expecting: [stem, code, credits]
+      if (!Array.isArray(row) || row.length < 2) return;
 
-      if (Array.isArray(row)) {
-        if (
-          row.length >= 3 &&
-          typeof row[0] === "string" &&
-          typeof row[1] === "string"
-        ) {
-          subject = row[0];
-          code = row[1];
-          credits = row[2];
-        } else {
-          const first = String(row[0] ?? "");
-          const parts = first.split(/[\s-]+/);
-          subject = parts[0] || "";
-          code = parts.slice(1).join(" ") || "";
-          credits = row[1] ?? "";
-        }
-      } else if (row && typeof row === "object") {
-        subject = row.subject || row.dept || "";
-        code = row.code || row.number || "";
-        credits = row.credits ?? row.credit_hours ?? "";
-      }
+      const stem = String(row[0] ?? "").trim();
+      const code = String(row[1] ?? "").trim();        // handle int or str
+      const rawCredits = row[2];                        // int or null/undefined
+      const credNum = Number.isFinite(Number(rawCredits)) ? Number(rawCredits) : 0;
 
-      const credNum =
-        credits !== "" && credits != null && !Number.isNaN(+credits)
-          ? +credits
-          : "";
-      if (credNum !== "" && Number.isFinite(credNum)) termCredits += credNum;
+      termCredits += credNum;
 
-      const courseCode = [subject, code].filter(Boolean).join("-");
+      const courseCode = [stem, code].filter(Boolean).join("-");
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${escapeHtml(courseCode)}</td>
-        <td>${credNum !== "" ? credNum : ""}</td>
+        <td>${credNum}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -422,6 +403,7 @@ function renderSchedule(semesters) {
 
   wrap.style.display = "block";
 }
+
 
 function prettifyTermName(key) {
   return String(key)
