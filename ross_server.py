@@ -120,7 +120,7 @@ async def make_schedule(req: ScheduleRequest, request: Request) -> ScheduleRespo
 
     # >>> Mock semesters that your front-end will render
     semesters = ross_link.Schedule(req.majors, req.courses_taken).get_courses()
-    print(semesters)
+    
 
     return ScheduleResponse(
         message="Schedule sucessfully created!",
