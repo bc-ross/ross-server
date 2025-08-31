@@ -35,6 +35,14 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],            # For dev. For prod, list "moz-extension://<id>" etc.
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # -----------------------------
 # CORS (relaxed for dev)
 # Adjust allow_origins in prod.
@@ -154,7 +162,6 @@ async def http_exception_handler(_: Request, exc: HTTPException):
 async def unhandled_exception_handler(_: Request, exc: Exception):
     log.exception("Unhandled error: %s", exc)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
-
 
 if __name__ == "__main__":
     import uvicorn

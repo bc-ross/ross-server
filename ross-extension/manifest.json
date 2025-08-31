@@ -1,0 +1,22 @@
+{
+  "manifest_version": 2,
+  "name": "FastAPI Talker (MV2)",
+  "version": "1.0",
+  "description": "Posts to a local FastAPI server and shows the reply.",
+  "browser_action": { "default_popup": "popup.html" },
+  "permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*",
+    "storage"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "icons": { "48": "icon-48.png" },
+  "applications": {
+    "gecko": {
+      "id": "fastapi-talker@example.com",
+      "strict_min_version": "78.0"
+    }
+  }
+}

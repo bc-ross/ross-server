@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ROSS: Raven Optimized Schedule System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+
+</head>
+<body>
+
+  <!-- HERO -->
+  <header class="hero">
+    <h1>ROSS</h1>
+    <h2>Raven Optimized Scheduling System</h2>
+    <div class="hero-actions">
+      <button id="openWho" class="ghost-btn">Who we are</button>
+    </div>
+  </header>
+
+  <!-- CONTENT -->
+  <main class="content">
+    <section class="grid">
+      <!-- LEFT: Autocomplete picker -->
+      <div class="card" aria-labelledby="left-title">
+        <h3 id="left-title">Search for your courses/majors</h3>
+        <div class="field-wrap">
+          <input
+            class="input"
+            id="searchInput"
+            type="text"
+            placeholder="Type to search…"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="dropdownList"
+          />
+          <div id="dropdown" class="dropdown" role="listbox">
+            <ul id="dropdownList"></ul>
+          </div>
+          <p class="hint">Start typing to search for a major and select from the list. </p>
+        </div>
+
+        <hr class="sep" />
+
+        <h3>Selected</h3>
+        <ul id="selectedList" class="chips" aria-live="polite"></ul>
+      </div>
+
+      <!-- RIGHT: Free-entry taken courses -->
+      <div class="card" aria-labelledby="right-title">
+        <h3 id="right-title">Courses already taken</h3>
+        <form id="takenForm" autocomplete="off">
+          <input
+            class="input"
+            id="takenInput"
+            type="text"
+            placeholder="e.g., THEO-1100 (press Enter to add)"
+            autocomplete="off"
+          />
+        </form>
+        <p class="hint">Type in classes taken as course code (THEO-1100). Press <strong>Enter</strong> to add; click × to remove.</p>
+
+        <hr class="sep" />
+
+        <h3>Taken list</h3>
+        <ul id="takenList" class="chips" aria-live="polite"></ul>
+      </div>
+    </section>
+
+    <!-- CTA BUTTON -->
+    <div class="cta-wrap">
+      <button id="makeScheduleBtn" class="cta">MAKE MY SCHEDULE!</button>
+    </div>
+
+    <!-- LOADING STATE -->
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Your super schedule is currently being created!</p>
+    </div>
+
+    <!-- SIMPLE RESULT MESSAGE -->
+    <div id="result" class="result"></div>
+
+    <!-- Schedule output (now horizontal, Excel-like) -->
+    <div id="scheduleWrap" style="display:none; margin: 10px 0 70px;">
+      <div id="schedule" class="schedule-grid"></div>
+    </div>
+  </main>
+
+  <!-- WHO WE ARE MODAL -->
+  <div id="whoOverlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="whoTitle">
+      <button id="closeWho" class="modal-close" aria-label="Close dialog">×</button>
+      <h2 id="whoTitle">Who we are</h2>
+
+      <div class="modal-body">
+        <p>Explanation of ROSS here.</p>
+
+        <h3>Our mission</h3>
+        <p>Maybe explain the mission here</p>
+
+        <h3>Team</h3>
+        <ul class="bio-list">
+          <!--Can be copied to add more people-->
+          <li>
+            <strong>NAME HERE</strong> — JOB HERE<br>
+            <span>EXPLANATION</span>
+          </li>
+        </ul>
+
+        <h3>How it works</h3>
+        <ol>
+          <li>Select your intended majors and enter courses you have credit for.</li>
+          <li>ROSS does cool stuffs with that</li>
+          <li>BOOM ya get ur schedule back!</li>
+        </ol>
+
+        <p class="muted">Questions or ideas part here?</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
