@@ -340,10 +340,16 @@ function renderSchedule(semesters) {
   const entries = Object.entries(semesters)
     .filter(([_, v]) => Array.isArray(v))
     .map(([key, rows]) => {
-      const num = (String(key).match(/\d+/) || [9999])[0];
-      return { key, num: parseInt(num, 10), rows };
+      const isIncoming = String(key).toLowerCase() === "incoming";
+      const num = isIncoming ? -1 : (String(key).match(/\d+/) || [9999])[0];
+      return { key, isIncoming, num: parseInt(num, 10), rows };
     })
-    .sort((a, b) => a.num - b.num);
+    .sort((a, b) => {
+      // incoming always first
+      if (a.isIncoming && !b.isIncoming) return -1;
+      if (!a.isIncoming && b.isIncoming) return 1;
+      return a.num - b.num;
+    });
 
   if (!entries.length) {
     wrap.style.display = "none";
@@ -370,12 +376,11 @@ function renderSchedule(semesters) {
     let termCredits = 0;
 
     rows.forEach((row) => {
-      // Expecting: [stem, code, credits]
       if (!Array.isArray(row) || row.length < 2) return;
 
       const stem = String(row[0] ?? "").trim();
-      const code = String(row[1] ?? "").trim();        // handle int or str
-      const rawCredits = row[2];                        // int or null/undefined
+      const code = String(row[1] ?? "").trim();
+      const rawCredits = row[2];
       const credNum = Number.isFinite(Number(rawCredits)) ? Number(rawCredits) : 0;
 
       termCredits += credNum;
@@ -403,6 +408,7 @@ function renderSchedule(semesters) {
 
   wrap.style.display = "block";
 }
+
 
 
 function prettifyTermName(key) {
