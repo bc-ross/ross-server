@@ -236,6 +236,18 @@
     }
   });
 
+  function formatTermName(key) {
+  if (!key) return '';
+  const lower = key.toLowerCase();
+  if (lower === 'incoming') return 'Incoming';
+  if (lower.startsWith('semester-')) {
+    const num = lower.split('-')[1];
+    return `Semester ${num}`;
+  }
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+
   function renderSchedule(semesters) {
     clear(scheduleEl);
 
@@ -253,7 +265,7 @@
       card.className = 'schedule-term';
 
       const h = document.createElement('h4');
-      h.textContent = termName;
+      h.textContent = formatTermName(termName);
       card.appendChild(h);
 
       const table = document.createElement('table');
