@@ -6,7 +6,6 @@
   <link rel="icon" href="/static/favicon.ico?v=2">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="static/WebDesignCSSCode.css" />
-
 </head>
 <body>
 
@@ -82,9 +81,14 @@
     <!-- SIMPLE RESULT MESSAGE -->
     <div id="result" class="result"></div>
 
-    <!-- Schedule output (now horizontal, Excel-like) -->
-    <div id="scheduleWrap" style="display:none; margin: 10px 0 70px;">
+    <!-- Schedule output -->
+    <div id="scheduleWrap" style="display:none; margin: 10px 0 16px;">
       <div id="schedule" class="schedule-grid"></div>
+    </div>
+
+    <!-- NEW: Course Requirements button (appears after schedule is built) -->
+    <div id="reqBtnWrap" class="hero-actions" style="display:none; margin-bottom: 70px;">
+      <button id="openReasons" class="ghost-btn">Course requirements</button>
     </div>
   </main>
 
@@ -93,30 +97,50 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="whoTitle">
       <button id="closeWho" class="modal-close" aria-label="Close dialog">×</button>
       <h2 id="whoTitle">Who we are</h2>
-
       <div class="modal-body">
         <p>Explanation of ROSS here.</p>
-
         <h3>Our mission</h3>
         <p>Maybe explain the mission here</p>
-
         <h3>Team</h3>
         <ul class="bio-list">
-          <!--Can be copied to add more people-->
           <li>
             <strong>NAME HERE</strong> — JOB HERE<br>
             <span>EXPLANATION</span>
           </li>
         </ul>
-
         <h3>How it works</h3>
         <ol>
           <li>Select your intended majors and enter courses you have credit for.</li>
           <li>ROSS does cool stuffs with that</li>
           <li>BOOM ya get ur schedule back!</li>
         </ol>
-
         <p class="muted">Questions or ideas part here?</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW: Course Requirements MODAL -->
+  <div id="reasonsOverlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reasonsTitle">
+      <button id="closeReasons" class="modal-close" aria-label="Close dialog">×</button>
+      <h2 id="reasonsTitle">Course Requirements & Core</h2>
+      <div class="modal-body">
+        <div class="table-scroller">
+          <table class="requirements-table" id="reasonsTable" aria-describedby="reasonsHelp">
+            <thead>
+              <tr>
+                <th>Course</th>
+                <th>Major&nbsp;Req</th>
+                <th>Foundations</th>
+                <th>Skills & Perspectives</th>
+              </tr>
+            </thead>
+            <tbody><!-- populated by JS --></tbody>
+          </table>
+        </div>
+        <p id="reasonsHelp" class="muted" style="margin-top:8px;">
+          “Major Req” shows ✓ if the course is required by the major or as a listed course prerequisite.
+        </p>
       </div>
     </div>
   </div>

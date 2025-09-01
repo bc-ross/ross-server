@@ -12,11 +12,6 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
 # -----------------------------
-# INPUT RUST FUNCTIONS
-# -----------------------------
-
-
-# -----------------------------
 # Logging
 # -----------------------------
 logging.basicConfig(
