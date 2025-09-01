@@ -1,351 +1,365 @@
-// -----------------------------
-// Simple helpers
-// -----------------------------
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+/* ROSS front-end interactions
+   - Autocomplete majors
+   - Taken courses chips
+   - Build schedule grid
+   - Course requirements table modal
+   - NEW: per-course quick details modal (click any course row)
+*/
 
-function openOverlay(el) { el.style.display = "flex"; el.setAttribute("aria-hidden", "false"); }
-function closeOverlay(el) { el.style.display = "none"; el.setAttribute("aria-hidden", "true"); }
+(() => {
+  // ---------------------------
+  // Elements
+  // ---------------------------
+  const searchInput   = document.getElementById('searchInput');
+  const dropdown      = document.getElementById('dropdown');
+  const dropdownList  = document.getElementById('dropdownList');
+  const selectedList  = document.getElementById('selectedList');
 
-// -----------------------------
-// Modal: Who we are
-// -----------------------------
-(function initWhoModal(){
-  const openBtn = $('#openWho');
-  const overlay = $('#whoOverlay');
-  const closeBtn = $('#closeWho');
+  const takenForm     = document.getElementById('takenForm');
+  const takenInput    = document.getElementById('takenInput');
+  const takenList     = document.getElementById('takenList');
 
-  openBtn?.addEventListener('click', () => openOverlay(overlay));
-  closeBtn?.addEventListener('click', () => closeOverlay(overlay));
-  overlay?.addEventListener('click', (e) => {
-    if (e.target === overlay) closeOverlay(overlay);
-  });
-})();
+  const makeBtn       = document.getElementById('makeScheduleBtn');
+  const loadingEl     = document.getElementById('loading');
+  const resultEl      = document.getElementById('result');
 
-// -----------------------------
-// State
-// -----------------------------
-const state = {
-  majors: [],           // selected majors
-  taken: [],            // manually-entered completed courses
-  reasons: null,        // reasons object from API
-  semesters: null       // schedule grid from API
-};
+  const scheduleWrap  = document.getElementById('scheduleWrap');
+  const scheduleEl    = document.getElementById('schedule');
+  const reqBtnWrap    = document.getElementById('reqBtnWrap');
 
-// -----------------------------
-// Autocomplete (Majors)
-// -----------------------------
-(async function initMajorsAutocomplete(){
-  const input = $('#searchInput');
-  const dropdown = $('#dropdown');
-  const list = $('#dropdownList');
-  const selectedList = $('#selectedList');
+  // Modals (who)
+  const whoOverlay    = document.getElementById('whoOverlay');
+  document.getElementById('openWho')?.addEventListener('click', () => openModal(whoOverlay));
+  document.getElementById('closeWho')?.addEventListener('click', () => closeModal(whoOverlay));
 
-  let allMajors = [];
-  try {
-    const res = await fetch('/api/majors');
-    const data = await res.json();
-    allMajors = Array.isArray(data.items) ? data.items : [];
-  } catch (e) {
-    // Non-fatal: allow manual entry fallback
-    allMajors = [];
-  }
+  // Modals (full reasons table)
+  const reasonsOverlay = document.getElementById('reasonsOverlay');
+  const reasonsTableBody = document.querySelector('#reasonsTable tbody');
+  document.getElementById('openReasons')?.addEventListener('click', () => openModal(reasonsOverlay));
+  document.getElementById('closeReasons')?.addEventListener('click', () => closeModal(reasonsOverlay));
 
-  function renderSelected(){
-    selectedList.innerHTML = '';
-    state.majors.forEach((m, idx) => {
-      const li = document.createElement('li');
-      li.className = 'chip';
-      li.innerHTML = `${m} <button aria-label="Remove">×</button>`;
-      li.querySelector('button').addEventListener('click', () => {
-        state.majors.splice(idx,1);
-        renderSelected();
-      });
-      selectedList.appendChild(li);
+  // NEW: Modal (per-course quick details)
+  const courseOverlay = document.getElementById('courseOverlay');
+  const cdCourse = document.getElementById('cdCourse');
+  const cdMajor = document.getElementById('cdMajor');
+  const cdFoundations = document.getElementById('cdFoundations');
+  const cdSkills = document.getElementById('cdSkills');
+  document.getElementById('closeCourse')?.addEventListener('click', () => closeModal(courseOverlay));
+
+  // Close modals on ESC and overlay click
+  [whoOverlay, reasonsOverlay, courseOverlay].forEach(overlay => {
+    overlay?.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal(overlay);
     });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      [whoOverlay, reasonsOverlay, courseOverlay].forEach(closeModal);
+    }
+  });
+
+  // ---------------------------
+  // State
+  // ---------------------------
+  let majors = [];            // fetched list for autocomplete
+  let selectedMajors = [];    // user-selected majors
+  let takenCourses = [];      // user-entered "already taken"
+  let currentReasons = {};    // reasons payload from backend (keyed by "STEM-CODE")
+  let scheduleId = null;      // opaque id from backend
+
+  // ---------------------------
+  // Utilities
+  // ---------------------------
+  function openModal(overlay) {
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    overlay.setAttribute('aria-hidden', 'false');
+  }
+  function closeModal(overlay) {
+    if (!overlay) return;
+    overlay.style.display = 'none';
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+  function chip(label, onRemove) {
+    const li = document.createElement('li');
+    li.className = 'chip';
+    li.innerHTML = `<span>${label}</span><button type="button" aria-label="Remove">×</button>`;
+    li.querySelector('button').addEventListener('click', () => onRemove?.());
+    return li;
+  }
+  function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+  function isProgramRequired(reasonItems) {
+    return reasonItems?.some(r => r.type === 'ProgramRequired');
+  }
+  function extractTags(reasonItems, kind) {
+    // kind: 'Foundation' | 'SkillsAndPerspective'
+    return [...new Set((reasonItems || [])
+      .filter(r => r.type === kind)
+      .map(r => r.name)
+      .filter(Boolean)
+    )];
+  }
+  function renderBadgeList(names) {
+    if (!names || names.length === 0) return '—';
+    return names.map(n => `<span class="badge">${escapeHtml(n)}</span>`).join(' ');
+  }
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
   }
 
-  function showMatches(q){
-    const ql = q.trim().toLowerCase();
-    if (!ql) { dropdown.style.display = 'none'; return; }
-    const items = allMajors.filter(m => m.toLowerCase().includes(ql) && !state.majors.includes(m)).slice(0,12);
-    if (items.length === 0){ dropdown.style.display = 'none'; return; }
-    list.innerHTML = '';
-    items.forEach(m => {
+  // ---------------------------
+  // Autocomplete majors
+  // ---------------------------
+  async function fetchMajors() {
+    try {
+      const res = await fetch('/api/majors');
+      const data = await res.json();
+      majors = Array.isArray(data?.items) ? data.items : [];
+    } catch (e) {
+      majors = [];
+      console.warn('Failed to fetch majors', e);
+    }
+  }
+  fetchMajors(); // fire and forget
+
+  // very simple filter
+  searchInput?.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) {
+      dropdown.style.display = 'none';
+      return;
+    }
+    const matches = majors.filter(m => m.toLowerCase().includes(q)).slice(0, 20);
+    clear(dropdownList);
+    matches.forEach(m => {
       const li = document.createElement('li');
       li.textContent = m;
       li.addEventListener('click', () => {
-        state.majors.push(m);
-        renderSelected();
-        input.value = '';
+        if (!selectedMajors.includes(m)) {
+          selectedMajors.push(m);
+          renderSelected();
+        }
         dropdown.style.display = 'none';
-        input.focus();
+        searchInput.value = '';
       });
-      list.appendChild(li);
+      dropdownList.appendChild(li);
     });
-    dropdown.style.display = 'block';
-  }
-
-  input.addEventListener('input', () => showMatches(input.value));
-  input.addEventListener('focus', () => showMatches(input.value));
-  document.addEventListener('click', (e) => {
-    if (!dropdown.contains(e.target) && e.target !== input) dropdown.style.display = 'none';
+    dropdown.style.display = matches.length ? 'block' : 'none';
   });
 
-  renderSelected();
-})();
-
-// -----------------------------
-// Taken Courses input
-// -----------------------------
-(function initTakenInput(){
-  const form = $('#takenForm');
-  const input = $('#takenInput');
-  const list = $('#takenList');
-
-  function renderTaken(){
-    list.innerHTML = '';
-    state.taken.forEach((c, idx) => {
-      const li = document.createElement('li');
-      li.className = 'chip';
-      li.innerHTML = `${c} <button aria-label="Remove">×</button>`;
-      li.querySelector('button').addEventListener('click', () => {
-        state.taken.splice(idx,1);
-        renderTaken();
-      });
-      list.appendChild(li);
+  function renderSelected() {
+    clear(selectedList);
+    selectedMajors.forEach(m => {
+      selectedList.appendChild(chip(m, () => {
+        selectedMajors = selectedMajors.filter(x => x !== m);
+        renderSelected();
+      }));
     });
   }
 
-  form.addEventListener('submit', (e) => {
+  // ---------------------------
+  // Taken courses input
+  // ---------------------------
+  takenForm?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const val = (input.value || '').trim().toUpperCase();
-    if (!val) return;
-    if (!state.taken.includes(val)) state.taken.push(val);
-    input.value = '';
-    renderTaken();
   });
-
-  // Allow Enter on input to submit
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter'){
+  takenInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      form.dispatchEvent(new Event('submit'));
-    }
-  });
-
-  renderTaken();
-})();
-
-// -----------------------------
-// Build schedule grid
-// -----------------------------
-function renderSchedule(semesters){
-  const wrap = $('#scheduleWrap');
-  const container = $('#schedule');
-  container.innerHTML = '';
-
-  if (!semesters || typeof semesters !== 'object'){
-    wrap.style.display = 'none';
-    return;
-  }
-
-  // Sorted by natural term order if keys like "semester-1"
-  const entries = Object.entries(semesters)
-    .filter(([_, v]) => Array.isArray(v))
-    .sort((a,b) => a[0].localeCompare(b[0], undefined, {numeric:true}));
-
-  if (entries.length === 0){
-    wrap.style.display = 'none';
-    return;
-  }
-
-  for (const [term, rows] of entries){
-    // rows like ["MATH","101",3,"Calculus I"] or tuples
-    const div = document.createElement('div');
-    div.className = 'schedule-term';
-
-    const title = document.createElement('h4');
-    title.textContent = term.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase());
-    div.appendChild(title);
-
-    const table = document.createElement('table');
-    const thead = document.createElement('thead');
-    thead.innerHTML = `
-      <tr>
-        <th>Course</th>
-        <th>Code</th>
-        <th>Credits</th>
-        <th>Title</th>
-      </tr>
-    `;
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-    let total = 0;
-    rows.forEach((r) => {
-      // Expect [stem, code, credits?, title?]
-      const stem = r[0];
-      const code = r[1];
-      const credits = r.length > 2 && r[2] != null ? r[2] : '';
-      const title = r.length > 3 ? r[3] : '';
-      if (typeof credits === 'number') total += credits;
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${stem ?? ''}</td>
-        <td>${code ?? ''}</td>
-        <td>${credits === '' ? '' : credits}</td>
-        <td>${title ?? ''}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    div.appendChild(table);
-
-    const summary = document.createElement('div');
-    summary.className = 'schedule-summary';
-    summary.textContent = `Total credits: ${total}`;
-    div.appendChild(summary);
-
-    container.appendChild(div);
-  }
-
-  wrap.style.display = 'block';
-}
-
-// -----------------------------
-// NEW: Build the Course Requirements table from reasons
-// -----------------------------
-function normalizeReasons(reasons){
-  // returns array of {course, isMajorReq, foundations[], skills[]}
-  const out = [];
-  if (!reasons || typeof reasons !== 'object') return out;
-
-  for (const [course, arr] of Object.entries(reasons)){
-    const items = Array.isArray(arr) ? arr : [];
-    let isMajor = false;
-    const foundations = new Set();
-    const skills = new Set();
-
-    for (const obj of items){
-      const t = obj?.type;
-      if (t === 'ProgramRequired' || t === 'CourseReq'){
-        isMajor = true;
-      } else if (t === 'Foundation'){
-        if (obj?.name) foundations.add(obj.name);
-      } else if (t === 'SkillsAndPerspective'){
-        if (obj?.name) skills.add(obj.name);
+      const v = takenInput.value.trim().toUpperCase();
+      if (v && !takenCourses.includes(v)) {
+        takenCourses.push(v);
+        renderTaken();
       }
-      // Ignore "Core" for this table per request
+      takenInput.value = '';
     }
+  });
 
-    out.push({
-      course,
-      isMajorReq: isMajor,
-      foundations: Array.from(foundations),
-      skills: Array.from(skills)
+  function renderTaken() {
+    clear(takenList);
+    takenCourses.forEach(c => {
+      takenList.appendChild(chip(c, () => {
+        takenCourses = takenCourses.filter(x => x !== c);
+        renderTaken();
+      }));
     });
   }
 
-  // Stable sort: by course code
-  out.sort((a,b) => a.course.localeCompare(b.course, undefined, {numeric:true}));
-  return out;
-}
-
-function renderReasonsTable(reasons){
-  const tbody = $('#reasonsTable tbody');
-  tbody.innerHTML = '';
-  const rows = normalizeReasons(reasons);
-
-  rows.forEach(row => {
-    const tr = document.createElement('tr');
-    const majorCell = row.isMajorReq ? `<span class="check">✓</span>` : '';
-    const fnds = row.foundations.map(n => `<span class="badge">${n}</span>`).join(' ');
-    const skls = row.skills.map(n => `<span class="badge">${n}</span>`).join(' ');
-
-    tr.innerHTML = `
-      <td>${row.course}</td>
-      <td>${majorCell}</td>
-      <td>${fnds}</td>
-      <td>${skls}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-// -----------------------------
-// Modal: Reasons (like Who we are)
-// -----------------------------
-(function initReasonsModal(){
-  const overlay = $('#reasonsOverlay');
-  const openBtn = $('#openReasons');
-  const closeBtn = $('#closeReasons');
-
-  openBtn?.addEventListener('click', () => {
-    renderReasonsTable(state.reasons);
-    openOverlay(overlay);
-  });
-  closeBtn?.addEventListener('click', () => closeOverlay(overlay));
-  overlay?.addEventListener('click', (e) => {
-    if (e.target === overlay) closeOverlay(overlay);
-  });
-})();
-
-// -----------------------------
-// Make Schedule
-// -----------------------------
-(function initScheduleButton(){
-  const btn = $('#makeScheduleBtn');
-  const loading = $('#loading');
-  const result = $('#result');
-  const reqBtnWrap = $('#reqBtnWrap');
-
-  btn.addEventListener('click', async () => {
-    result.style.display = 'none';
+  // ---------------------------
+  // Build schedule
+  // ---------------------------
+  makeBtn?.addEventListener('click', async () => {
+    if (selectedMajors.length === 0) {
+      resultEl.style.display = 'block';
+      resultEl.textContent = 'Please select at least one major.';
+      return;
+    }
+    resultEl.style.display = 'none';
+    scheduleWrap.style.display = 'none';
     reqBtnWrap.style.display = 'none';
+    clear(scheduleEl);
 
-    loading.style.display = 'block';
-    btn.disabled = true;
+    loadingEl.style.display = 'block';
+    makeBtn.disabled = true;
 
     try {
-      const payload = {
-        majors: state.majors,
-        courses_taken: state.taken
-      };
-
       const res = await fetch('/api/schedule', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          majors: selectedMajors,
+          courses_taken: takenCourses
+        })
       });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
       const data = await res.json();
-      state.semesters = data.semesters || null;
-      state.reasons = data.reasons || null;
 
-      renderSchedule(state.semesters);
+      loadingEl.style.display = 'none';
+      makeBtn.disabled = false;
 
-      // Only show the "Course requirements" button if we got reasons
-      if (state.reasons && Object.keys(state.reasons).length){
-        reqBtnWrap.style.display = 'block';
-      } else {
-        reqBtnWrap.style.display = 'none';
+      if (!res.ok) {
+        resultEl.style.display = 'block';
+        resultEl.textContent = data?.detail || 'Failed to build schedule.';
+        return;
       }
 
-      loading.style.display = 'none';
-      btn.disabled = false;
+      // Save reasons + id for later modals
+      currentReasons = data?.reasons || {};
+      scheduleId = data?.schedule_id || null;
 
-      result.textContent = data.message || 'Schedule created!';
-      result.style.display = 'block';
+      renderSchedule(data?.semesters || {});
+      scheduleWrap.style.display = 'block';
+      reqBtnWrap.style.display = 'flex';
+
+      // Build the full reasons table once
+      populateReasonsTable(currentReasons);
+
     } catch (err) {
-      loading.style.display = 'none';
-      btn.disabled = false;
-      result.textContent = 'Something went wrong creating your schedule.';
-      result.style.display = 'block';
+      loadingEl.style.display = 'none';
+      makeBtn.disabled = false;
+      resultEl.style.display = 'block';
+      resultEl.textContent = 'Network error.';
       console.error(err);
     }
   });
+
+  function renderSchedule(semesters) {
+    clear(scheduleEl);
+
+    // semesters is an object with keys "semester-1", ... and value arrays like ["MATH","101",3,"Calculus I"]
+    const terms = Object.entries(semesters)
+      .filter(([_, rows]) => Array.isArray(rows))
+      .sort((a, b) => {
+        // keep "incoming" in front if present; otherwise natural by key
+        const [ka] = a, [kb] = b;
+        if (ka.toLowerCase() === 'incoming') return -1;
+        if (kb.toLowerCase() === 'incoming') return 1;
+        return ka.localeCompare(kb, undefined, {numeric: true, sensitivity: 'base'});
+      });
+
+    terms.forEach(([termName, rows]) => {
+      const card = document.createElement('div');
+      card.className = 'schedule-term';
+
+      const h = document.createElement('h4');
+      h.textContent = termName;
+      card.appendChild(h);
+
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = `
+        <tr>
+          <th>Course</th>
+          <th>Credits</th>
+        </tr>`;
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+
+      let credits = 0;
+      rows.forEach(item => {
+        // item is [stem, code, credits, title?]
+        const stem = String(item[0] ?? '').trim();
+        const code = String(item[1] ?? '').trim();
+        const creditsVal = Number(item[2] ?? 0) || 0;
+        credits += creditsVal;
+
+        const courseKey = `${stem}-${code}`;
+        const tr = document.createElement('tr');
+        tr.className = 'course-row';
+        tr.dataset.course = courseKey;
+
+        const tdCourse = document.createElement('td');
+        tdCourse.textContent = `${stem}-${code}`;
+        const tdCred = document.createElement('td');
+        tdCred.textContent = String(creditsVal);
+
+        tr.appendChild(tdCourse);
+        tr.appendChild(tdCred);
+
+        // Click to open per-course details
+        tr.addEventListener('click', () => openCourseDetails(courseKey));
+
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+
+      const summary = document.createElement('div');
+      summary.className = 'schedule-summary';
+      summary.textContent = `Total credits: ${credits}`;
+
+      card.appendChild(table);
+      card.appendChild(summary);
+      scheduleEl.appendChild(card);
+    });
+  }
+
+  // ---------------------------
+  // Full reasons modal population
+  // ---------------------------
+  function populateReasonsTable(reasons) {
+    clear(reasonsTableBody);
+
+    const sortedKeys = Object.keys(reasons || {}).sort();
+    sortedKeys.forEach(courseKey => {
+      const items = reasons[courseKey] || [];
+      const major = isProgramRequired(items);
+      const foundations = extractTags(items, 'Foundation');
+      const skills = extractTags(items, 'SkillsAndPerspective');
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(courseKey)}</td>
+        <td class="check">${major ? '✓' : '—'}</td>
+        <td>${renderBadgeList(foundations)}</td>
+        <td>${renderBadgeList(skills)}</td>
+      `;
+      reasonsTableBody.appendChild(tr);
+    });
+  }
+
+  // ---------------------------
+  // NEW: per-course details modal
+  // ---------------------------
+  function openCourseDetails(courseKey) {
+    const items = currentReasons?.[courseKey] || [];
+    const major = isProgramRequired(items);
+    const foundations = extractTags(items, 'Foundation');
+    const skills = extractTags(items, 'SkillsAndPerspective');
+
+    // Fill modal cells
+    cdCourse.textContent = courseKey;
+    cdMajor.innerHTML = major ? '<span class="check">✓</span>' : '—';
+    cdFoundations.innerHTML = renderBadgeList(foundations);
+    cdSkills.innerHTML = renderBadgeList(skills);
+
+    openModal(courseOverlay);
+  }
+
 })();

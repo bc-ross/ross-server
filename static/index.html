@@ -86,7 +86,7 @@
       <div id="schedule" class="schedule-grid"></div>
     </div>
 
-    <!-- NEW: Course Requirements button (appears after schedule is built) -->
+    <!-- Course Requirements button (appears after schedule is built) -->
     <div id="reqBtnWrap" class="hero-actions" style="display:none; margin-bottom: 70px;">
       <button id="openReasons" class="ghost-btn">Course requirements</button>
     </div>
@@ -119,7 +119,7 @@
     </div>
   </div>
 
-  <!-- NEW: Course Requirements MODAL -->
+  <!-- Course Requirements (full table) MODAL -->
   <div id="reasonsOverlay" class="modal-overlay" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reasonsTitle">
       <button id="closeReasons" class="modal-close" aria-label="Close dialog">×</button>
@@ -140,6 +140,39 @@
         </div>
         <p id="reasonsHelp" class="muted" style="margin-top:8px;">
           “Major Req” shows ✓ if the course is required by the major or as a listed course prerequisite.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW: Per-course quick details MODAL -->
+  <div id="courseOverlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="courseTitle">
+      <button id="closeCourse" class="modal-close" aria-label="Close dialog">×</button>
+      <h2 id="courseTitle">Course details</h2>
+      <div class="modal-body">
+        <div class="table-scroller">
+          <table class="requirements-table">
+            <thead>
+              <tr>
+                <th style="width:220px;">Course</th>
+                <th>Major&nbsp;Req</th>
+                <th>Foundations</th>
+                <th>Skills & Perspectives</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td id="cdCourse">—</td>
+                <td id="cdMajor">—</td>
+                <td id="cdFoundations">—</td>
+                <td id="cdSkills">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted" style="margin-top:8px;">
+          Click any course in the schedule to view its tags.
         </p>
       </div>
     </div>

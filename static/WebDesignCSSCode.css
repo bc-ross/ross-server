@@ -232,7 +232,7 @@ body{
 .modal-overlay{
   position: fixed; inset: 0;
   background: rgba(7,10,14,.65);
-  display: none;                 /* hidden by default */
+  display: none;
   align-items: center; justify-content: center;
   z-index: 1000;
   padding: 24px;
@@ -255,7 +255,7 @@ body{
 }
 .modal-body{
   padding: 18px 22px 22px;
-  overflow: auto;              /* scrollable content */
+  overflow: auto;
 }
 .modal-close{
   position: absolute; top: 10px; right: 12px;
@@ -275,7 +275,7 @@ body{
 .modal-body::-webkit-scrollbar{ width: 10px; }
 .modal-body::-webkit-scrollbar-thumb{ background:#243244; border-radius: 10px; }
 
-/* === Schedule table styles (Excel-like columns) === */
+/* === Schedule table styles === */
 .schedule-grid{
   display: grid;
   grid-auto-flow: column;
@@ -308,7 +308,7 @@ body{
   white-space: nowrap;
 }
 
-/* === NEW: Requirements table inside modal === */
+/* === Requirements tables === */
 .table-scroller{
   overflow:auto;
   border: 1px solid #223043;
@@ -317,7 +317,7 @@ body{
 .requirements-table{
   width:100%;
   border-collapse: collapse;
-  min-width: 720px; /* room for 4 columns on small screens */
+  min-width: 720px;
 }
 .requirements-table th,
 .requirements-table td{
@@ -345,4 +345,12 @@ body{
 .check{
   font-weight: 900;
   font-size: 16px;
+}
+
+/* === Clickable course rows === */
+.course-row{
+  cursor: pointer;
+}
+.course-row:hover td{
+  background-color:#142030;
 }
