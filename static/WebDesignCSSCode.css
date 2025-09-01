@@ -314,11 +314,13 @@ body{
   border: 1px solid #223043;
   border-radius: 12px;
 }
+/* In your existing requirements-table block */
 .requirements-table{
   width:100%;
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 880px; /* was 720px; room for Core column */
 }
+
 .requirements-table th,
 .requirements-table td{
   padding: 10px 12px;

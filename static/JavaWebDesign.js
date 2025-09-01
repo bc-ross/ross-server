@@ -44,6 +44,8 @@
   const cdMajor = document.getElementById('cdMajor');
   const cdFoundations = document.getElementById('cdFoundations');
   const cdSkills = document.getElementById('cdSkills');
+  const cdCore = document.getElementById('cdCore');
+
   document.getElementById('closeCourse')?.addEventListener('click', () => closeModal(courseOverlay));
 
   // Close modals on ESC and overlay click
@@ -348,18 +350,20 @@
   // NEW: per-course details modal
   // ---------------------------
   function openCourseDetails(courseKey) {
-    const items = currentReasons?.[courseKey] || [];
-    const major = isProgramRequired(items);
-    const foundations = extractTags(items, 'Foundation');
-    const skills = extractTags(items, 'SkillsAndPerspective');
+  const items = currentReasons?.[courseKey] || [];
+  const major = isProgramRequired(items);
+  const foundations = extractTags(items, 'Foundation');
+  const skills = extractTags(items, 'SkillsAndPerspective');
+  const core = extractTags(items, 'Core'); // NEW
 
-    // Fill modal cells
-    cdCourse.textContent = courseKey;
-    cdMajor.innerHTML = major ? '<span class="check">✓</span>' : '—';
-    cdFoundations.innerHTML = renderBadgeList(foundations);
-    cdSkills.innerHTML = renderBadgeList(skills);
+  cdCourse.textContent = courseKey;
+  cdMajor.innerHTML = major ? '<span class="check">✓</span>' : '—';
+  cdCore.innerHTML = renderBadgeList(core);              // NEW
+  cdFoundations.innerHTML = renderBadgeList(foundations);
+  cdSkills.innerHTML = renderBadgeList(skills);
 
-    openModal(courseOverlay);
-  }
+  openModal(courseOverlay);
+}
+
 
 })();
