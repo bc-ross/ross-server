@@ -338,7 +338,7 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(courseKey)}</td>
-        <td class="check">${major ? '✓' : '—'}</td>
+        <td class="check">${major ? '✓' : ' '}</td>
         <td>${renderBadgeList(foundations)}</td>
         <td>${renderBadgeList(skills)}</td>
       `;
