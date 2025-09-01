@@ -37,7 +37,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],            # For dev. For prod, list "moz-extension://<id>" etc.
+    allow_origins=["*"],  # For dev. For prod, list "moz-extension://<id>" etc.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,6 +73,7 @@ def serve_index() -> FileResponse:
     if not os.path.isfile(index_path):
         raise HTTPException(status_code=404, detail="static/index.html not found")
     return FileResponse(index_path)
+
 
 @app.get("/favicon.ico", response_class=FileResponse, include_in_schema=False)
 def serve_favicon() -> FileResponse:
@@ -112,6 +113,7 @@ class ScheduleResponse(BaseModel):
     courses_taken: List[str]
     # New: object whose keys are "semester-1", "semester-2", ... each with rows like ["MATH","101",3,"Calculus I"]
     semesters: Optional[Dict[str, list[tuple[str, str | int, Optional[int]]]]] = None
+    reasons: Optional[dict[str, list[dict[str, str]]]] = None
     schedule_id: Optional[str] = None
 
 
@@ -134,15 +136,17 @@ async def make_schedule(req: ScheduleRequest, request: Request) -> ScheduleRespo
     # Fake id for now
     schedule_id = "sched_" + str(abs(hash(tuple(req.majors) + tuple(req.courses_taken))))[:10]
 
-    # >>> Mock semesters that your front-end will render
-    semesters = ross_link.Schedule(req.majors, req.courses_taken).get_courses()
-    
+    schedule = ross_link.Schedule(req.majors, req.courses_taken)
+    schedule.validate()
+    semesters = schedule.get_courses()
+    reasons = schedule.get_reasons()
 
     return ScheduleResponse(
         message="Schedule sucessfully created!",
         majors=req.majors,
         courses_taken=req.courses_taken,
         semesters=semesters,  # <-- key bit
+        reasons=reasons,
         schedule_id=schedule_id,
     )
 
@@ -170,6 +174,7 @@ async def http_exception_handler(_: Request, exc: HTTPException):
 async def unhandled_exception_handler(_: Request, exc: Exception):
     log.exception("Unhandled error: %s", exc)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
 
 if __name__ == "__main__":
     import uvicorn
