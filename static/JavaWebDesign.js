@@ -2,8 +2,8 @@
    - Autocomplete majors
    - Taken courses chips
    - Build schedule grid
-   - Course requirements table modal
-   - NEW: per-course quick details modal (click any course row)
+   - Full "Course requirements" modal
+   - Per-course popup: if ProgramRequired => show block message only
 */
 
 (() => {
@@ -33,31 +33,29 @@
   document.getElementById('closeWho')?.addEventListener('click', () => closeModal(whoOverlay));
 
   // Modals (full reasons table)
-  const reasonsOverlay = document.getElementById('reasonsOverlay');
+  const reasonsOverlay   = document.getElementById('reasonsOverlay');
   const reasonsTableBody = document.querySelector('#reasonsTable tbody');
   document.getElementById('openReasons')?.addEventListener('click', () => openModal(reasonsOverlay));
   document.getElementById('closeReasons')?.addEventListener('click', () => closeModal(reasonsOverlay));
 
-  // NEW: Modal (per-course quick details)
-  const courseOverlay = document.getElementById('courseOverlay');
-  const cdCourse = document.getElementById('cdCourse');
-  const cdMajor = document.getElementById('cdMajor');
-  const cdFoundations = document.getElementById('cdFoundations');
-  const cdSkills = document.getElementById('cdSkills');
-  const cdCore = document.getElementById('cdCore');
-
+  // Per-course modal
+  const courseOverlay   = document.getElementById('courseOverlay');
+  const cdBlockMsg      = document.getElementById('cdBlockMsg');
+  const cdTableWrap     = document.getElementById('cdTableWrap');
+  const cdCourse        = document.getElementById('cdCourse');
+  const cdMajor         = document.getElementById('cdMajor');
+  const cdCore          = document.getElementById('cdCore');
+  const cdFoundations   = document.getElementById('cdFoundations');
+  const cdSkills        = document.getElementById('cdSkills');
   document.getElementById('closeCourse')?.addEventListener('click', () => closeModal(courseOverlay));
 
-  // Close modals on ESC and overlay click
-  [whoOverlay, reasonsOverlay, courseOverlay].forEach(overlay => {
-    overlay?.addEventListener('click', (e) => {
-      if (e.target === overlay) closeModal(overlay);
-    });
+  // Close modals on overlay click
+  ;[whoOverlay, reasonsOverlay, courseOverlay].forEach(overlay => {
+    overlay?.addEventListener('click', (e) => { if (e.target === overlay) closeModal(overlay); });
   });
+  // Esc to close
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      [whoOverlay, reasonsOverlay, courseOverlay].forEach(closeModal);
-    }
+    if (e.key === 'Escape') [whoOverlay, reasonsOverlay, courseOverlay].forEach(closeModal);
   });
 
   // ---------------------------
@@ -86,21 +84,21 @@
     const li = document.createElement('li');
     li.className = 'chip';
     li.innerHTML = `<span>${label}</span><button type="button" aria-label="Remove">×</button>`;
-    li.querySelector('button').addEventListener('click', () => onRemove?.());
+    li.querySelector('button')?.addEventListener('click', () => onRemove?.());
     return li;
   }
-  function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+  function clear(el) { while (el && el.firstChild) el.removeChild(el.firstChild); }
 
   function isProgramRequired(reasonItems) {
-    return reasonItems?.some(r => r.type === 'ProgramRequired');
+    return Array.isArray(reasonItems) && reasonItems.some(r => r?.type === 'ProgramRequired');
   }
   function extractTags(reasonItems, kind) {
-    // kind: 'Foundation' | 'SkillsAndPerspective'
-    return [...new Set((reasonItems || [])
-      .filter(r => r.type === kind)
-      .map(r => r.name)
-      .filter(Boolean)
-    )];
+    // kind: 'Foundation' | 'SkillsAndPerspective' | 'Core'
+    const set = new Set();
+    (reasonItems || []).forEach(r => {
+      if (r?.type === kind && r?.name) set.add(r.name);
+    });
+    return [...set];
   }
   function renderBadgeList(names) {
     if (!names || names.length === 0) return '—';
@@ -123,20 +121,15 @@
       const res = await fetch('/api/majors');
       const data = await res.json();
       majors = Array.isArray(data?.items) ? data.items : [];
-    } catch (e) {
+    } catch (_) {
       majors = [];
-      console.warn('Failed to fetch majors', e);
     }
   }
-  fetchMajors(); // fire and forget
+  fetchMajors();
 
-  // very simple filter
   searchInput?.addEventListener('input', () => {
     const q = searchInput.value.trim().toLowerCase();
-    if (!q) {
-      dropdown.style.display = 'none';
-      return;
-    }
+    if (!q) { dropdown.style.display = 'none'; return; }
     const matches = majors.filter(m => m.toLowerCase().includes(q)).slice(0, 20);
     clear(dropdownList);
     matches.forEach(m => {
@@ -168,9 +161,7 @@
   // ---------------------------
   // Taken courses input
   // ---------------------------
-  takenForm?.addEventListener('submit', (e) => {
-    e.preventDefault();
-  });
+  takenForm?.addEventListener('submit', (e) => e.preventDefault());
   takenInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -214,10 +205,7 @@
       const res = await fetch('/api/schedule', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          majors: selectedMajors,
-          courses_taken: takenCourses
-        })
+        body: JSON.stringify({ majors: selectedMajors, courses_taken: takenCourses })
       });
       const data = await res.json();
 
@@ -230,7 +218,6 @@
         return;
       }
 
-      // Save reasons + id for later modals
       currentReasons = data?.reasons || {};
       scheduleId = data?.schedule_id || null;
 
@@ -238,7 +225,6 @@
       scheduleWrap.style.display = 'block';
       reqBtnWrap.style.display = 'flex';
 
-      // Build the full reasons table once
       populateReasonsTable(currentReasons);
 
     } catch (err) {
@@ -253,15 +239,13 @@
   function renderSchedule(semesters) {
     clear(scheduleEl);
 
-    // semesters is an object with keys "semester-1", ... and value arrays like ["MATH","101",3,"Calculus I"]
     const terms = Object.entries(semesters)
       .filter(([_, rows]) => Array.isArray(rows))
       .sort((a, b) => {
-        // keep "incoming" in front if present; otherwise natural by key
         const [ka] = a, [kb] = b;
         if (ka.toLowerCase() === 'incoming') return -1;
         if (kb.toLowerCase() === 'incoming') return 1;
-        return ka.localeCompare(kb, undefined, {numeric: true, sensitivity: 'base'});
+        return ka.localeCompare(kb, undefined, { numeric: true, sensitivity: 'base' });
       });
 
     terms.forEach(([termName, rows]) => {
@@ -285,7 +269,6 @@
 
       let credits = 0;
       rows.forEach(item => {
-        // item is [stem, code, credits, title?]
         const stem = String(item[0] ?? '').trim();
         const code = String(item[1] ?? '').trim();
         const creditsVal = Number(item[2] ?? 0) || 0;
@@ -304,7 +287,6 @@
         tr.appendChild(tdCourse);
         tr.appendChild(tdCred);
 
-        // Click to open per-course details
         tr.addEventListener('click', () => openCourseDetails(courseKey));
 
         tbody.appendChild(tr);
@@ -327,7 +309,6 @@
   // ---------------------------
   function populateReasonsTable(reasons) {
     clear(reasonsTableBody);
-
     const sortedKeys = Object.keys(reasons || {}).sort();
     sortedKeys.forEach(courseKey => {
       const items = reasons[courseKey] || [];
@@ -338,7 +319,7 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(courseKey)}</td>
-        <td class="check">${major ? '✓' : ' '}</td>
+        <td class="check">${major ? '✓' : '—'}</td>
         <td>${renderBadgeList(foundations)}</td>
         <td>${renderBadgeList(skills)}</td>
       `;
@@ -347,23 +328,37 @@
   }
 
   // ---------------------------
-  // NEW: per-course details modal
+  // Per-course details (with major-required block)
   // ---------------------------
   function openCourseDetails(courseKey) {
-  const items = currentReasons?.[courseKey] || [];
-  const major = isProgramRequired(items);
-  const foundations = extractTags(items, 'Foundation');
-  const skills = extractTags(items, 'SkillsAndPerspective');
-  const core = extractTags(items, 'Core'); // NEW
+    // Clean slate each time
+    cdBlockMsg?.classList.add('hidden');
+    cdTableWrap?.classList.add('hidden');
 
-  cdCourse.textContent = courseKey;
-  cdMajor.innerHTML = major ? '<span class="check">✓</span>' : '—';
-  cdCore.innerHTML = renderBadgeList(core);              // NEW
-  cdFoundations.innerHTML = renderBadgeList(foundations);
-  cdSkills.innerHTML = renderBadgeList(skills);
+    const items = currentReasons?.[courseKey] || [];
+    const major = isProgramRequired(items);
+    const foundations = extractTags(items, 'Foundation');
+    const skills = extractTags(items, 'SkillsAndPerspective');
+    const core = extractTags(items, 'Core');
 
-  openModal(courseOverlay);
-}
+    // Update modal title
+    const titleEl = document.getElementById('courseTitle');
+    if (titleEl) titleEl.textContent = `Course details — ${courseKey}`;
 
+    if (major) {
+      // Show ONLY the message
+      cdBlockMsg?.classList.remove('hidden');
+    } else {
+      // Show the details table
+      if (cdCourse)      cdCourse.textContent = courseKey;
+      if (cdMajor)       cdMajor.innerHTML = '—';
+      if (cdCore)        cdCore.innerHTML = renderBadgeList(core);
+      if (cdFoundations) cdFoundations.innerHTML = renderBadgeList(foundations);
+      if (cdSkills)      cdSkills.innerHTML = renderBadgeList(skills);
+      cdTableWrap?.classList.remove('hidden');
+    }
+
+    openModal(courseOverlay);
+  }
 
 })();

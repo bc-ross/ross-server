@@ -37,7 +37,7 @@
           <div id="dropdown" class="dropdown" role="listbox">
             <ul id="dropdownList"></ul>
           </div>
-          <p class="hint">Start typing to search for a major and select from the list. </p>
+          <p class="hint">Start typing to search for a major and select from the list.</p>
         </div>
 
         <hr class="sep" />
@@ -139,45 +139,47 @@
           </table>
         </div>
         <p id="reasonsHelp" class="muted" style="margin-top:8px;">
-          “Major Req” shows ✓ if the course is required by the major or as a listed course prerequisite. If a course does not
-          have any of these tags, it is likely a Core class, such as THEO-1100.
+          “Major Req” shows ✓ if the course is required by the major or as a listed course prerequisite.
         </p>
       </div>
     </div>
   </div>
 
-  <!-- NEW: Per-course quick details MODAL -->
+  <!-- Per-course quick details MODAL -->
   <div id="courseOverlay" class="modal-overlay" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="courseTitle">
       <button id="closeCourse" class="modal-close" aria-label="Close dialog">×</button>
       <h2 id="courseTitle">Course details</h2>
       <div class="modal-body">
-        <div class="table-scroller">
-      <table class="requirements-table">
-  <thead>
-    <tr>
-      <th style="width:220px;">Course</th>
-      <th>Major&nbsp;Req</th>
-      <th>Core</th>
-      <th>Foundations</th>
-      <th>Skills & Perspectives</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td id="cdCourse">—</td>
-      <td id="cdMajor">—</td>
-      <td id="cdCore">—</td>
-      <td id="cdFoundations">—</td>
-      <td id="cdSkills">—</td>
-    </tr>
-  </tbody>
-</table>
-
+        <!-- Message shown ONLY when major-required -->
+        <div id="cdBlockMsg" class="block-msg hidden">
+          <p><strong>This course is required by your major, you cannot swap it.</strong></p>
         </div>
-        <p class="muted" style="margin-top:8px;">
-          Click any course in the schedule to view its tags.
-        </p>
+
+        <!-- Details shown for non-major-required courses -->
+        <div id="cdTableWrap" class="table-scroller hidden">
+          <table class="requirements-table" id="cdTable">
+            <thead>
+              <tr>
+                <th style="width:220px;">Course</th>
+                <th>Major&nbsp;Req</th>
+                <th>Core</th>
+                <th>Foundations</th>
+                <th>Skills & Perspectives</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td id="cdCourse">—</td>
+                <td id="cdMajor">—</td>
+                <td id="cdCore">—</td>
+                <td id="cdFoundations">—</td>
+                <td id="cdSkills">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
       </div>
     </div>
   </div>

@@ -314,13 +314,11 @@ body{
   border: 1px solid #223043;
   border-radius: 12px;
 }
-/* In your existing requirements-table block */
 .requirements-table{
   width:100%;
   border-collapse: collapse;
-  min-width: 880px; /* was 720px; room for Core column */
+  min-width: 820px;
 }
-
 .requirements-table th,
 .requirements-table td{
   padding: 10px 12px;
@@ -349,10 +347,19 @@ body{
   font-size: 16px;
 }
 
-/* === Clickable course rows === */
-.course-row{
-  cursor: pointer;
+/* message box (major-required) */
+.block-msg{
+  background: #101826;
+  border: 1px solid #2a3a50;
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #cfe0ff;
+  margin-bottom: 10px;
 }
-.course-row:hover td{
-  background-color:#142030;
-}
+
+/* util */
+.hidden { display: none !important; }
+
+/* Clickable course rows */
+.course-row{ cursor:pointer; }
+.course-row:hover td{ background:#142030; }
