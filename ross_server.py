@@ -74,6 +74,14 @@ def serve_index() -> FileResponse:
         raise HTTPException(status_code=404, detail="static/index.html not found")
     return FileResponse(index_path)
 
+@app.get("/favicon.ico", response_class=FileResponse, include_in_schema=False)
+def serve_favicon() -> FileResponse:
+    """Serve the SPA entrypoint."""
+    index_path = os.path.join(STATIC_DIR, "favicon.ico")
+    if not os.path.isfile(index_path):
+        raise HTTPException(status_code=404, detail="static/favicon.ico not found")
+    return FileResponse(index_path)
+
 
 # -----------------------------
 # Models
