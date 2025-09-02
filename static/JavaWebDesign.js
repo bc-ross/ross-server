@@ -49,6 +49,12 @@
   const cdSkills = document.getElementById('cdSkills');
   document.getElementById('closeCourse')?.addEventListener('click', () => closeModal(courseOverlay));
 
+  // Replacement popup elements
+  const replacementOverlay = document.getElementById('replacementOverlay');
+  const replacementList = document.getElementById('replacementList');
+  const replacementFilters = document.getElementById('replacementFilters');
+  document.getElementById('closeReplacement')?.addEventListener('click', () => closeModal(replacementOverlay));
+
   // Close modals on overlay click
   ;[whoOverlay, reasonsOverlay, courseOverlay].forEach(overlay => {
     overlay?.addEventListener('click', (e) => { if (e.target === overlay) closeModal(overlay); });
@@ -310,7 +316,12 @@
         tr.appendChild(tdCourse);
         tr.appendChild(tdCred);
 
-        tr.addEventListener('click', () => openCourseDetails(courseKey));
+        tr.addEventListener('click', () => {
+          // Mark as selected for replacement
+          document.querySelectorAll('.course-row.selected').forEach(r => r.classList.remove('selected'));
+          tr.classList.add('selected');
+          openCourseDetails(courseKey);
+        });
 
         tbody.appendChild(tr);
       });
@@ -370,9 +381,22 @@
     const titleEl = document.getElementById('courseTitle');
     if (titleEl) titleEl.textContent = `Course details — ${courseKey}`;
 
+    // Add Find Replacement button if not already present
+    let findBtn = document.getElementById('findReplacementBtn');
+    if (!findBtn) {
+      findBtn = document.createElement('button');
+      findBtn.id = 'findReplacementBtn';
+      findBtn.textContent = 'Find Replacement';
+      findBtn.className = 'btn';
+      findBtn.style.marginTop = '12px';
+      cdTableWrap?.appendChild(findBtn);
+    }
+    findBtn.onclick = () => openReplacementPopup(courseKey, foundations, skills);
+
     if (major) {
       // Show ONLY the message
       cdBlockMsg?.classList.remove('hidden');
+      findBtn.style.display = 'none';
     } else {
       // Show the details table
       if (cdCourse) cdCourse.textContent = courseKey;
@@ -381,9 +405,77 @@
       if (cdFoundations) cdFoundations.innerHTML = renderBadgeList(foundations);
       if (cdSkills) cdSkills.innerHTML = renderBadgeList(skills);
       cdTableWrap?.classList.remove('hidden');
+      findBtn.style.display = '';
     }
 
     openModal(courseOverlay);
   }
 
-})();
+  // Open replacement popup and send request
+  async function openReplacementPopup(courseKey, foundations, skills) {
+    // Show loading state
+    clear(replacementList);
+    replacementList.innerHTML = '<div>Loading replacements...</div>';
+    openModal(replacementOverlay);
+
+    // Find the first reason for this course (or build a minimal one)
+    const items = currentReasons?.[courseKey] || [];
+    let reason = items[0] || { name: foundations[0] || '', type: 'Foundation' };
+
+    // Send request to backend
+    try {
+      const res = await fetch('/api/replacements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || 'Failed to fetch replacements');
+      renderReplacementList(data?.courses || [], foundations, skills);
+    } catch (err) {
+      replacementList.innerHTML = `<div class="error">${err.message}</div>`;
+    }
+  }
+
+  // Render replacement courses and filters
+  function renderReplacementList(courses) {
+    clear(replacementList);
+    clear(replacementFilters);
+
+    if (!courses.length) {
+      replacementList.innerHTML = '<div>No matching replacements found.</div>';
+      return;
+    }
+    courses.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'replacement-course';
+      div.innerHTML = `<strong>${escapeHtml(c.course)}</strong>`;
+      div.style.cursor = 'pointer';
+      div.title = 'Click to replace original course';
+      div.onclick = () => {
+        replaceCourseInSchedule(c.course);
+        closeModal(replacementOverlay);
+      };
+      replacementList.appendChild(div);
+    });
+  }
+
+  function replaceCourseInSchedule(newCourse) {
+    // Find the selected course row in the schedule and replace its text
+    const selectedRow = document.querySelector('.course-row.selected');
+    if (selectedRow) {
+      const tdCourse = selectedRow.querySelector('td');
+      if (tdCourse) tdCourse.textContent = newCourse;
+      selectedRow.classList.remove('selected');
+    }
+    // Also update the course details popup
+    if (cdCourse) cdCourse.textContent = newCourse;
+    const titleEl = document.getElementById('courseTitle');
+    if (titleEl) titleEl.textContent = `Course details — ${newCourse}`;
+
+    // Close all popups
+    [whoOverlay, reasonsOverlay, courseOverlay, replacementOverlay].forEach(closeModal);
+  }
+  }
+
+)();
