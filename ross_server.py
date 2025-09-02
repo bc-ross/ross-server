@@ -157,6 +157,11 @@ def get_majors():
     return MajorListResponse(items=majors)
 
 
+alt_courses = sched.get_other_courses(
+    getattr(ross_link.ReasonTypes, reason["type"]), name=reason.get("name"), prog=reason.get("prog")
+)
+
+
 # -----------------------------
 # Error handlers (nice JSON)
 # -----------------------------
