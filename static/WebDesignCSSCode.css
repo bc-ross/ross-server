@@ -314,10 +314,11 @@ body{
   border: 1px solid #223043;
   border-radius: 12px;
 }
-.requirements-table{
-  width:100%;
+.requirements-table {
+  width: 1200px;
+  max-width: 100%;
   border-collapse: collapse;
-  min-width: 820px;
+  margin-bottom: 8px;
 }
 .requirements-table th,
 .requirements-table td{

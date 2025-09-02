@@ -100,6 +100,17 @@
     });
     return [...set];
   }
+
+  function extractElectives(reasonItems) {
+    // Returns array of "<program>:<name>" for ProgramElective type
+    const out = [];
+    (reasonItems || []).forEach(r => {
+      if (r?.type === 'ProgramElective' && r?.program && r?.name) {
+        out.push(`${r.program}: ${r.name}`);
+      }
+    });
+    return out;
+  }
   function renderBadgeList(names) {
     if (!names || names.length === 0) return '—';
     return names.map(n => `<span class="badge">${escapeHtml(n)}</span>`).join(' ');
@@ -327,6 +338,7 @@
       const major = isProgramRequired(items);
       const foundations = extractTags(items, 'Foundation');
       const skills = extractTags(items, 'SkillsAndPerspective');
+      const electives = extractElectives(items);
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -334,6 +346,7 @@
         <td class="check">${major ? '✓' : ' '}</td>
         <td>${renderBadgeList(foundations)}</td>
         <td>${renderBadgeList(skills)}</td>
+        <td>${renderBadgeList(electives)}</td>
       `;
       reasonsTableBody.appendChild(tr);
     });
