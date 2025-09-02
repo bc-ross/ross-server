@@ -10,43 +10,43 @@
   // ---------------------------
   // Elements
   // ---------------------------
-  const searchInput   = document.getElementById('searchInput');
-  const dropdown      = document.getElementById('dropdown');
-  const dropdownList  = document.getElementById('dropdownList');
-  const selectedList  = document.getElementById('selectedList');
+  const searchInput = document.getElementById('searchInput');
+  const dropdown = document.getElementById('dropdown');
+  const dropdownList = document.getElementById('dropdownList');
+  const selectedList = document.getElementById('selectedList');
 
-  const takenForm     = document.getElementById('takenForm');
-  const takenInput    = document.getElementById('takenInput');
-  const takenList     = document.getElementById('takenList');
+  const takenForm = document.getElementById('takenForm');
+  const takenInput = document.getElementById('takenInput');
+  const takenList = document.getElementById('takenList');
 
-  const makeBtn       = document.getElementById('makeScheduleBtn');
-  const loadingEl     = document.getElementById('loading');
-  const resultEl      = document.getElementById('result');
+  const makeBtn = document.getElementById('makeScheduleBtn');
+  const loadingEl = document.getElementById('loading');
+  const resultEl = document.getElementById('result');
 
-  const scheduleWrap  = document.getElementById('scheduleWrap');
-  const scheduleEl    = document.getElementById('schedule');
-  const reqBtnWrap    = document.getElementById('reqBtnWrap');
+  const scheduleWrap = document.getElementById('scheduleWrap');
+  const scheduleEl = document.getElementById('schedule');
+  const reqBtnWrap = document.getElementById('reqBtnWrap');
 
   // Modals (who)
-  const whoOverlay    = document.getElementById('whoOverlay');
+  const whoOverlay = document.getElementById('whoOverlay');
   document.getElementById('openWho')?.addEventListener('click', () => openModal(whoOverlay));
   document.getElementById('closeWho')?.addEventListener('click', () => closeModal(whoOverlay));
 
   // Modals (full reasons table)
-  const reasonsOverlay   = document.getElementById('reasonsOverlay');
+  const reasonsOverlay = document.getElementById('reasonsOverlay');
   const reasonsTableBody = document.querySelector('#reasonsTable tbody');
   document.getElementById('openReasons')?.addEventListener('click', () => openModal(reasonsOverlay));
   document.getElementById('closeReasons')?.addEventListener('click', () => closeModal(reasonsOverlay));
 
   // Per-course modal
-  const courseOverlay   = document.getElementById('courseOverlay');
-  const cdBlockMsg      = document.getElementById('cdBlockMsg');
-  const cdTableWrap     = document.getElementById('cdTableWrap');
-  const cdCourse        = document.getElementById('cdCourse');
-  const cdMajor         = document.getElementById('cdMajor');
-  const cdCore          = document.getElementById('cdCore');
-  const cdFoundations   = document.getElementById('cdFoundations');
-  const cdSkills        = document.getElementById('cdSkills');
+  const courseOverlay = document.getElementById('courseOverlay');
+  const cdBlockMsg = document.getElementById('cdBlockMsg');
+  const cdTableWrap = document.getElementById('cdTableWrap');
+  const cdCourse = document.getElementById('cdCourse');
+  const cdMajor = document.getElementById('cdMajor');
+  const cdCore = document.getElementById('cdCore');
+  const cdFoundations = document.getElementById('cdFoundations');
+  const cdSkills = document.getElementById('cdSkills');
   document.getElementById('closeCourse')?.addEventListener('click', () => closeModal(courseOverlay));
 
   // Close modals on overlay click
@@ -215,7 +215,7 @@
     try {
       const res = await fetch('/api/schedule', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ majors: selectedMajors, courses_taken: takenCourses })
       });
       const data = await res.json();
@@ -248,15 +248,15 @@
   });
 
   function formatTermName(key) {
-  if (!key) return '';
-  const lower = key.toLowerCase();
-  if (lower === 'incoming') return 'Incoming';
-  if (lower.startsWith('semester-')) {
-    const num = lower.split('-')[1];
-    return `Semester ${num}`;
+    if (!key) return '';
+    const lower = key.toLowerCase();
+    if (lower === 'incoming') return 'Incoming';
+    if (lower.startsWith('semester-')) {
+      const num = lower.split('-')[1];
+      return `Semester ${num}`;
+    }
+    return key.charAt(0).toUpperCase() + key.slice(1);
   }
-  return key.charAt(0).toUpperCase() + key.slice(1);
-}
 
 
   function renderSchedule(semesters) {
@@ -375,11 +375,11 @@
       cdBlockMsg?.classList.remove('hidden');
     } else {
       // Show the details table
-      if (cdCourse)      cdCourse.textContent = courseKey;
-      if (cdMajor)       cdMajor.innerHTML = '—';
-      if (cdCore)        cdCore.innerHTML = renderBadgeList(core);
+      if (cdCourse) cdCourse.textContent = courseKey;
+      if (cdMajor) cdMajor.innerHTML = '—';
+      if (cdCore) cdCore.innerHTML = renderBadgeList(core);
       if (cdFoundations) cdFoundations.innerHTML = renderBadgeList(foundations);
-      if (cdSkills)      cdSkills.innerHTML = renderBadgeList(skills);
+      if (cdSkills) cdSkills.innerHTML = renderBadgeList(skills);
       cdTableWrap?.classList.remove('hidden');
     }
 
