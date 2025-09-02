@@ -1,427 +1,376 @@
-/* =========================
-       LEFT: Autocomplete select
-       ========================= */
-let COURSES = [];
+/* ROSS front-end interactions
+   - Autocomplete majors
+   - Taken courses chips
+   - Build schedule grid
+   - Full "Course requirements" modal
+   - Per-course popup: if ProgramRequired => show block message only
+*/
 
-window.addEventListener("DOMContentLoaded", async () => {
-  try {
-    const res = await fetch("/api/majors");
-    const data = await res.json();
-    COURSES = data.items || [];
-  } catch (err) {
-    console.error("Failed to load majors", err);
-  }
-});
+(() => {
+  // ---------------------------
+  // Elements
+  // ---------------------------
+  const searchInput   = document.getElementById('searchInput');
+  const dropdown      = document.getElementById('dropdown');
+  const dropdownList  = document.getElementById('dropdownList');
+  const selectedList  = document.getElementById('selectedList');
 
-const input = document.getElementById("searchInput");
-const dropdown = document.getElementById("dropdown");
-const dropdownList = document.getElementById("dropdownList");
-const selectedList = document.getElementById("selectedList");
-const selectedSet = new Set();
+  const takenForm     = document.getElementById('takenForm');
+  const takenInput    = document.getElementById('takenInput');
+  const takenList     = document.getElementById('takenList');
 
-function renderDropdown(items) {
-  dropdownList.innerHTML = "";
-  if (!items.length) {
-    dropdown.style.display = "none";
-    input.setAttribute("aria-expanded", "false");
-    return;
-  }
-  items.forEach((text, i) => {
-    const li = document.createElement("li");
-    li.textContent = text;
-    li.role = "option";
-    if (i === 0) li.classList.add("active");
-    li.addEventListener("click", () => selectCourse(text));
-    dropdownList.appendChild(li);
+  const makeBtn       = document.getElementById('makeScheduleBtn');
+  const loadingEl     = document.getElementById('loading');
+  const resultEl      = document.getElementById('result');
+
+  const scheduleWrap  = document.getElementById('scheduleWrap');
+  const scheduleEl    = document.getElementById('schedule');
+  const reqBtnWrap    = document.getElementById('reqBtnWrap');
+
+  // Modals (who)
+  const whoOverlay    = document.getElementById('whoOverlay');
+  document.getElementById('openWho')?.addEventListener('click', () => openModal(whoOverlay));
+  document.getElementById('closeWho')?.addEventListener('click', () => closeModal(whoOverlay));
+
+  // Modals (full reasons table)
+  const reasonsOverlay   = document.getElementById('reasonsOverlay');
+  const reasonsTableBody = document.querySelector('#reasonsTable tbody');
+  document.getElementById('openReasons')?.addEventListener('click', () => openModal(reasonsOverlay));
+  document.getElementById('closeReasons')?.addEventListener('click', () => closeModal(reasonsOverlay));
+
+  // Per-course modal
+  const courseOverlay   = document.getElementById('courseOverlay');
+  const cdBlockMsg      = document.getElementById('cdBlockMsg');
+  const cdTableWrap     = document.getElementById('cdTableWrap');
+  const cdCourse        = document.getElementById('cdCourse');
+  const cdMajor         = document.getElementById('cdMajor');
+  const cdCore          = document.getElementById('cdCore');
+  const cdFoundations   = document.getElementById('cdFoundations');
+  const cdSkills        = document.getElementById('cdSkills');
+  document.getElementById('closeCourse')?.addEventListener('click', () => closeModal(courseOverlay));
+
+  // Close modals on overlay click
+  ;[whoOverlay, reasonsOverlay, courseOverlay].forEach(overlay => {
+    overlay?.addEventListener('click', (e) => { if (e.target === overlay) closeModal(overlay); });
   });
-  dropdown.style.display = "block";
-  input.setAttribute("aria-expanded", "true");
-}
-
-function filterCourses(q) {
-  q = q.trim().toLowerCase();
-  if (!q) {
-    dropdown.style.display = "none";
-    input.setAttribute("aria-expanded", "false");
-    return;
-  }
-  const matches = COURSES.filter(
-    (c) => c.toLowerCase().includes(q) && !selectedSet.has(c)
-  );
-  renderDropdown(matches);
-}
-
-function addChip(listEl, setRef, text) {
-  const li = document.createElement("li");
-  li.className = "chip";
-  li.textContent = text;
-
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.setAttribute("aria-label", "Remove");
-  btn.textContent = "×";
-  btn.addEventListener("click", () => {
-    setRef.delete(text);
-    listEl.removeChild(li);
-    if (listEl === selectedList) filterCourses(input.value);
-    saveTaken();
+  // Esc to close
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') [whoOverlay, reasonsOverlay, courseOverlay].forEach(closeModal);
   });
 
-  li.appendChild(btn);
-  listEl.appendChild(li);
-}
+  // ---------------------------
+  // State
+  // ---------------------------
+  let majors = [];            // fetched list for autocomplete
+  let selectedMajors = [];    // user-selected majors
+  let takenCourses = [];      // user-entered "already taken"
+  let currentReasons = {};    // reasons payload from backend (keyed by "STEM-CODE")
+  let scheduleId = null;      // opaque id from backend
 
-function selectCourse(text) {
-  if (selectedSet.has(text)) return;
-  selectedSet.add(text);
-  addChip(selectedList, selectedSet, text);
-  input.value = "";
-  dropdown.style.display = "none";
-  input.setAttribute("aria-expanded", "false");
-  input.focus();
-}
-
-function moveActive(delta) {
-  const items = [...dropdownList.querySelectorAll("li")];
-  if (!items.length) return;
-  let idx = items.findIndex((li) => li.classList.contains("active"));
-  if (idx === -1) idx = 0;
-  items[idx].classList.remove("active");
-  idx = (idx + delta + items.length) % items.length;
-  items[idx].classList.add("active");
-  items[idx].scrollIntoView({ block: "nearest" });
-}
-
-input.addEventListener("input", (e) => filterCourses(e.target.value));
-input.addEventListener("keydown", (e) => {
-  if (dropdown.style.display !== "block") return;
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    moveActive(1);
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    moveActive(-1);
-  } else if (e.key === "Enter") {
-    e.preventDefault();
-    const active = dropdownList.querySelector("li.active");
-    if (active) selectCourse(active.textContent);
-  } else if (e.key === "Escape") {
-    dropdown.style.display = "none";
-    input.setAttribute("aria-expanded", "false");
+  // ---------------------------
+  // Utilities
+  // ---------------------------
+  function openModal(overlay) {
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    overlay.setAttribute('aria-hidden', 'false');
   }
-});
-document.addEventListener("click", (e) => {
-  if (!e.target.closest(".field-wrap")) {
-    dropdown.style.display = "none";
-    input.setAttribute("aria-expanded", "false");
+  function closeModal(overlay) {
+    if (!overlay) return;
+    overlay.style.display = 'none';
+    overlay.setAttribute('aria-hidden', 'true');
   }
-});
+  function chip(label, onRemove) {
+    const li = document.createElement('li');
+    li.className = 'chip';
+    li.innerHTML = `<span>${label}</span><button type="button" aria-label="Remove">×</button>`;
+    li.querySelector('button')?.addEventListener('click', () => onRemove?.());
+    return li;
+  }
+  function clear(el) { while (el && el.firstChild) el.removeChild(el.firstChild); }
 
-/* =======================================
-       RIGHT: Free-entry list with persistence
-       ======================================= */
-const takenForm = document.getElementById("takenForm");
-const takenInput = document.getElementById("takenInput");
-const takenList = document.getElementById("takenList");
-const STORAGE_KEY = "ross_taken_courses";
-const takenItems = new Set(
-  JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
-);
+  function isProgramRequired(reasonItems) {
+    return Array.isArray(reasonItems) && reasonItems.some(r => r?.type === 'ProgramRequired');
+  }
+  function extractTags(reasonItems, kind) {
+    // kind: 'Foundation' | 'SkillsAndPerspective' | 'Core'
+    const set = new Set();
+    (reasonItems || []).forEach(r => {
+      if (r?.type === kind && r?.name) set.add(r.name);
+    });
+    return [...set];
+  }
+  function renderBadgeList(names) {
+    if (!names || names.length === 0) return '—';
+    return names.map(n => `<span class="badge">${escapeHtml(n)}</span>`).join(' ');
+  }
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
 
-function saveTaken() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...takenItems]));
-}
+  // ---------------------------
+  // Autocomplete majors
+  // ---------------------------
+  async function fetchMajors() {
+    try {
+      const res = await fetch('/api/majors');
+      const data = await res.json();
+      majors = Array.isArray(data?.items) ? data.items : [];
+    } catch (_) {
+      majors = [];
+    }
+  }
+  fetchMajors();
 
-function addTakenChip(text) {
-  const li = document.createElement("li");
-  li.className = "chip";
-  li.textContent = text;
-
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.setAttribute("aria-label", "Remove");
-  btn.textContent = "×";
-  btn.addEventListener("click", () => {
-    takenItems.delete(text);
-    takenList.removeChild(li);
-    saveTaken();
+  searchInput?.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) { dropdown.style.display = 'none'; return; }
+    const matches = majors.filter(m => m.toLowerCase().includes(q)).slice(0, 20);
+    clear(dropdownList);
+    matches.forEach(m => {
+      const li = document.createElement('li');
+      li.textContent = m;
+      li.addEventListener('click', () => {
+        if (!selectedMajors.includes(m)) {
+          selectedMajors.push(m);
+          renderSelected();
+        }
+        dropdown.style.display = 'none';
+        searchInput.value = '';
+      });
+      dropdownList.appendChild(li);
+    });
+    dropdown.style.display = matches.length ? 'block' : 'none';
   });
 
-  li.appendChild(btn);
-  takenList.appendChild(li);
-}
+  function renderSelected() {
+    clear(selectedList);
+    selectedMajors.forEach(m => {
+      selectedList.appendChild(chip(m, () => {
+        selectedMajors = selectedMajors.filter(x => x !== m);
+        renderSelected();
+      }));
+    });
+  }
 
-// Hydrate saved items
-takenItems.forEach(addTakenChip);
+  // ---------------------------
+  // Taken courses input
+  // ---------------------------
+  takenForm?.addEventListener('submit', (e) => e.preventDefault());
+  takenInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const v = takenInput.value.trim().toUpperCase();
+      if (v && !takenCourses.includes(v)) {
+        takenCourses.push(v);
+        renderTaken();
+      }
+      takenInput.value = '';
+    }
+  });
 
-// Prevent navigation
-takenForm.addEventListener("submit", (e) => e.preventDefault());
+  function renderTaken() {
+    clear(takenList);
+    takenCourses.forEach(c => {
+      takenList.appendChild(chip(c, () => {
+        takenCourses = takenCourses.filter(x => x !== c);
+        renderTaken();
+      }));
+    });
+  }
 
-// Enter to add
-takenInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    let val = takenInput.value.trim();
-    if (!val) return;
-    val = val.toUpperCase(); // normalize
-    if (takenItems.has(val)) {
-      takenInput.value = "";
+  // ---------------------------
+  // Build schedule
+  // ---------------------------
+  makeBtn?.addEventListener('click', async () => {
+    if (selectedMajors.length === 0) {
+      resultEl.style.display = 'block';
+      resultEl.textContent = 'Please select at least one major.';
       return;
     }
-    takenItems.add(val);
-    addTakenChip(val);
-    saveTaken();
-    takenInput.value = "";
+    resultEl.style.display = 'none';
+    scheduleWrap.style.display = 'none';
+    reqBtnWrap.style.display = 'none';
+    clear(scheduleEl);
+
+    loadingEl.style.display = 'block';
+    makeBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ majors: selectedMajors, courses_taken: takenCourses })
+      });
+      const data = await res.json();
+
+      loadingEl.style.display = 'none';
+      makeBtn.disabled = false;
+
+      if (!res.ok) {
+        resultEl.style.display = 'block';
+        resultEl.textContent = data?.detail || 'Failed to build schedule.';
+        return;
+      }
+
+      currentReasons = data?.reasons || {};
+      scheduleId = data?.schedule_id || null;
+
+      renderSchedule(data?.semesters || {});
+      scheduleWrap.style.display = 'block';
+      reqBtnWrap.style.display = 'flex';
+
+      populateReasonsTable(currentReasons);
+
+    } catch (err) {
+      loadingEl.style.display = 'none';
+      makeBtn.disabled = false;
+      resultEl.style.display = 'block';
+      resultEl.textContent = 'Network error.';
+      console.error(err);
+    }
+  });
+
+  function formatTermName(key) {
+  if (!key) return '';
+  const lower = key.toLowerCase();
+  if (lower === 'incoming') return 'Incoming';
+  if (lower.startsWith('semester-')) {
+    const num = lower.split('-')[1];
+    return `Semester ${num}`;
   }
-});
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
 
-/* ============================
-       CTA: Show loading + POST JSON
-       ============================ */
-const btn = document.getElementById("makeScheduleBtn");
-const loading = document.getElementById("loading");
-const resultEl = document.getElementById("result");
 
-btn.addEventListener("click", async () => {
-  // UI: show loader, lock button
-  loading.style.display = "block";
-  resultEl.style.display = "none";
-  resultEl.textContent = "";
-  btn.disabled = true;
+  function renderSchedule(semesters) {
+    clear(scheduleEl);
 
-  // Build JSON payload for backend
-  const payload = {
-    majors: Array.from(selectedSet), // left column selections
-    courses_taken: Array.from(takenItems), // right column free entries
-  };
+    const terms = Object.entries(semesters)
+      .filter(([_, rows]) => Array.isArray(rows))
+      .sort((a, b) => {
+        const [ka] = a, [kb] = b;
+        if (ka.toLowerCase() === 'incoming') return -1;
+        if (kb.toLowerCase() === 'incoming') return 1;
+        return ka.localeCompare(kb, undefined, { numeric: true, sensitivity: 'base' });
+      });
 
-  try {
-    const res = await fetch("/api/schedule", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    terms.forEach(([termName, rows]) => {
+      const card = document.createElement('div');
+      card.className = 'schedule-term';
+
+      const h = document.createElement('h4');
+      h.textContent = formatTermName(termName);
+      card.appendChild(h);
+
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = `
+        <tr>
+          <th>Course</th>
+          <th>Credits</th>
+        </tr>`;
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+
+      let credits = 0;
+      rows.forEach(item => {
+        const stem = String(item[0] ?? '').trim();
+        const code = String(item[1] ?? '').trim();
+        const creditsVal = Number(item[2] ?? 0) || 0;
+        credits += creditsVal;
+
+        const courseKey = `${stem}-${code}`;
+        const tr = document.createElement('tr');
+        tr.className = 'course-row';
+        tr.dataset.course = courseKey;
+
+        const tdCourse = document.createElement('td');
+        tdCourse.textContent = `${stem}-${code}`;
+        const tdCred = document.createElement('td');
+        tdCred.textContent = String(creditsVal);
+
+        tr.appendChild(tdCourse);
+        tr.appendChild(tdCred);
+
+        tr.addEventListener('click', () => openCourseDetails(courseKey));
+
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+
+      const summary = document.createElement('div');
+      summary.className = 'schedule-summary';
+      summary.textContent = `Total credits: ${credits}`;
+
+      card.appendChild(table);
+      card.appendChild(summary);
+      scheduleEl.appendChild(card);
     });
+  }
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    console.log("Response →", data);
+  // ---------------------------
+  // Full reasons modal population
+  // ---------------------------
+  function populateReasonsTable(reasons) {
+    clear(reasonsTableBody);
+    const sortedKeys = Object.keys(reasons || {}).sort();
+    sortedKeys.forEach(courseKey => {
+      const items = reasons[courseKey] || [];
+      const major = isProgramRequired(items);
+      const foundations = extractTags(items, 'Foundation');
+      const skills = extractTags(items, 'SkillsAndPerspective');
 
-    // Show server message (and optionally more details)
-    loading.style.display = "none";
-    resultEl.style.display = "block";
-    resultEl.textContent =
-      data?.message || data?.status || "Schedule request received!";
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(courseKey)}</td>
+        <td class="check">${major ? '✓' : ' '}</td>
+        <td>${renderBadgeList(foundations)}</td>
+        <td>${renderBadgeList(skills)}</td>
+      `;
+      reasonsTableBody.appendChild(tr);
+    });
+  }
 
-    // Locate semesters in common shapes or fall back to a small mock so you see tables
-    let semesters =
-      data?.semesters ||
-      data?.plan?.semesters ||
-      data?.schedule?.semesters ||
-      (data &&
-      typeof data === "object" &&
-      Object.keys(data).some((k) => /^semester[- _]?\d+$/i.test(k))
-        ? data
-        : null);
-      
-      // -----------------------------------------------
-      // FIND A BETTER WAY TO DO THIS
-      // -----------------------------------------------
-      
-      if (!semesters) {
-      console.warn(
-        "No semesters in response; using mock so the table renders."
-      );
-      semesters = {
-        "semester-1": [
-          ["MATH", "101", 3, "Calculus I"],
-          ["CHEM", "110", 4, "General Chemistry I"],
-          ["ENGL", "120", 3, "Composition"],
-          ["THEO", "1100", 3, "Intro to Theology"],
-          ["HIST", "150", 3, "World History I"],
-        ],
-        "semester-2": [
-          ["MATH", "102", 3, "Calculus II"],
-          ["CHEM", "120", 4, "General Chemistry II"],
-          ["PHYS", "130", 4, "Physics I"],
-          ["PHIL", "101", 3, "Intro to Philosophy"],
-          ["ENGL", "200", 3, "Literature Survey"],
-        ],
-      };
+  // ---------------------------
+  // Per-course details (with major-required block)
+  // ---------------------------
+  function openCourseDetails(courseKey) {
+    // Clean slate each time
+    cdBlockMsg?.classList.add('hidden');
+    cdTableWrap?.classList.add('hidden');
+
+    const items = currentReasons?.[courseKey] || [];
+    const major = isProgramRequired(items);
+    const foundations = extractTags(items, 'Foundation');
+    const skills = extractTags(items, 'SkillsAndPerspective');
+    const core = extractTags(items, 'Core');
+
+    // Update modal title
+    const titleEl = document.getElementById('courseTitle');
+    if (titleEl) titleEl.textContent = `Course details — ${courseKey}`;
+
+    if (major) {
+      // Show ONLY the message
+      cdBlockMsg?.classList.remove('hidden');
+    } else {
+      // Show the details table
+      if (cdCourse)      cdCourse.textContent = courseKey;
+      if (cdMajor)       cdMajor.innerHTML = '—';
+      if (cdCore)        cdCore.innerHTML = renderBadgeList(core);
+      if (cdFoundations) cdFoundations.innerHTML = renderBadgeList(foundations);
+      if (cdSkills)      cdSkills.innerHTML = renderBadgeList(skills);
+      cdTableWrap?.classList.remove('hidden');
     }
 
-    renderSchedule(semesters);
-  } catch (err) {
-    loading.style.display = "none";
-    resultEl.style.display = "block";
-    resultEl.textContent = "Something went wrong sending your data. Try again.";
-    console.error(err);
-    document.getElementById("scheduleWrap").style.display = "none";
-  } finally {
-    btn.disabled = false; // make clickable again; remove if you want it to stay disabled
-  }
-});
-
-/* ============================
-       WHO WE ARE MODAL
-       ============================ */
-const openWho = document.getElementById("openWho");
-const overlay = document.getElementById("whoOverlay");
-const closeWho = document.getElementById("closeWho");
-let lastFocused = null;
-
-function getFocusable(container) {
-  return [
-    ...container.querySelectorAll(
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
-    ),
-  ];
-}
-
-function openModal() {
-  lastFocused = document.activeElement;
-  overlay.style.display = "flex";
-  overlay.setAttribute("aria-hidden", "false");
-  // lock background scroll
-  document.body.dataset.prevOverflow = document.body.style.overflow || "";
-  document.body.style.overflow = "hidden";
-  // focus first focusable in modal
-  const focusables = getFocusable(overlay);
-  if (focusables.length) focusables[0].focus();
-  overlay.addEventListener("keydown", trapTab);
-}
-
-function closeModal() {
-  overlay.style.display = "none";
-  overlay.setAttribute("aria-hidden", "true");
-  document.body.style.overflow = document.body.dataset.prevOverflow || "";
-  if (lastFocused) lastFocused.focus();
-  overlay.removeEventListener("keydown", trapTab);
-}
-
-function trapTab(e) {
-  if (e.key === "Escape") {
-    e.preventDefault();
-    closeModal();
-    return;
-  }
-  if (e.key !== "Tab") return;
-  const f = getFocusable(overlay);
-  if (!f.length) return;
-  const first = f[0],
-    last = f[f.length - 1];
-  if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault();
-    first.focus();
-  }
-}
-
-if (openWho) openWho.addEventListener("click", openModal);
-if (closeWho) closeWho.addEventListener("click", closeModal);
-overlay.addEventListener("click", (e) => {
-  if (e.target === overlay) closeModal();
-});
-
-/* ============================
-SCHEDULE RENDERER (no Notes col)
-============================ */
-function renderSchedule(semesters) {
-  const wrap = document.getElementById("scheduleWrap");
-  const container = document.getElementById("schedule");
-  container.innerHTML = "";
-
-  if (!semesters || typeof semesters !== "object") {
-    wrap.style.display = "none";
-    return;
+    openModal(courseOverlay);
   }
 
-  const entries = Object.entries(semesters)
-    .filter(([_, v]) => Array.isArray(v))
-    .map(([key, rows]) => {
-      const isIncoming = String(key).toLowerCase() === "incoming";
-      const num = isIncoming ? -1 : (String(key).match(/\d+/) || [9999])[0];
-      return { key, isIncoming, num: parseInt(num, 10), rows };
-    })
-    .sort((a, b) => {
-      // incoming always first
-      if (a.isIncoming && !b.isIncoming) return -1;
-      if (!a.isIncoming && b.isIncoming) return 1;
-      return a.num - b.num;
-    });
-
-  if (!entries.length) {
-    wrap.style.display = "none";
-    return;
-  }
-
-  for (const { key, rows } of entries) {
-    const term = document.createElement("div");
-    term.className = "schedule-term";
-
-    const h = document.createElement("h4");
-    h.textContent = prettifyTermName(key);
-    term.appendChild(h);
-
-    const table = document.createElement("table");
-    const thead = document.createElement("thead");
-    thead.innerHTML = `<tr>
-      <th>Course</th>
-      <th>Credits</th>
-    </tr>`;
-    table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-    let termCredits = 0;
-
-    rows.forEach((row) => {
-      if (!Array.isArray(row) || row.length < 2) return;
-
-      const stem = String(row[0] ?? "").trim();
-      const code = String(row[1] ?? "").trim();
-      const rawCredits = row[2];
-      const credNum = Number.isFinite(Number(rawCredits)) ? Number(rawCredits) : 0;
-
-      termCredits += credNum;
-
-      const courseCode = [stem, code].filter(Boolean).join("-");
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${escapeHtml(courseCode)}</td>
-        <td>${credNum}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    table.appendChild(tbody);
-    term.appendChild(table);
-
-    const summary = document.createElement("div");
-    summary.className = "schedule-summary";
-    summary.textContent = `Semester Credits: ${termCredits}`;
-    term.appendChild(summary);
-
-    container.appendChild(term);
-  }
-
-  wrap.style.display = "block";
-}
-
-
-
-function prettifyTermName(key) {
-  return String(key)
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function escapeHtml(s) {
-  return String(s ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
+})();
