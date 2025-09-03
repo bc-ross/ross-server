@@ -176,32 +176,6 @@ async def find_replacements(req: ReplacementRequest = Body(...)):
         all_alts = [{"course": c} for c in all_alts]
     return ReplacementResponse(courses=all_alts)
     # You may want to adjust how you get the schedule object
-    # For demo, just use the first major and all taken courses empty
-    majors = [""]
-    schedule = ross_link.Schedule(majors, [])
-    # Filter by foundations and skills
-    all_alts = schedule.get_other_courses(
-        getattr(ross_link.ReasonTypes, getattr(req, "type", None)),
-        name=getattr(req, "name", None),
-        prog=getattr(req, "prog", None)
-    )
-    filtered = []
-    for alt in all_alts:
-        # alt should be a dict in the same format as reasons list
-        f_ok = not req.foundations or any(f in (alt.get("foundations") or []) for f in req.foundations)
-        s_ok = not req.skills or any(s in (alt.get("skills") or []) for s in req.skills)
-        if f_ok and s_ok:
-            filtered.append(alt)
-    return ReplacementResponse(courses=filtered)
-
-    reason = req.reason
-    # Use the reason dict for get_other_courses
-    all_alts = schedule.get_other_courses(
-        getattr(ross_link.ReasonTypes, reason.get("type", None)),
-        name=reason.get("name", None),
-        prog=reason.get("prog", None)
-    )
-    return ReplacementResponse(courses=all_alts)
 
 class MajorListResponse(BaseModel):
     items: List[str]
