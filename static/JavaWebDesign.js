@@ -73,6 +73,17 @@
   let currentReasons = {};    // reasons payload from backend (keyed by "STEM-CODE")
   let scheduleId = null;      // opaque id from backend
 
+  // Session ID for anonymous user
+  function getSessionId() {
+    let sid = localStorage.getItem('ross_session_id');
+    if (!sid) {
+      sid = crypto.randomUUID ? crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+      localStorage.setItem('ross_session_id', sid);
+    }
+    return sid;
+  }
+  const sessionId = getSessionId();
+
   // ---------------------------
   // Utilities
   // ---------------------------
@@ -221,8 +232,8 @@
     try {
       const res = await fetch('/api/schedule', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ majors: selectedMajors, courses_taken: takenCourses })
+        headers: { 'Content-Type': 'application/json', 'X-ROSS-Session': sessionId },
+        body: JSON.stringify({ majors: selectedMajors, courses_taken: takenCourses, session_id: sessionId })
       });
       const data = await res.json();
 
@@ -426,8 +437,8 @@
     try {
       const res = await fetch('/api/replacements', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason })
+        headers: { 'Content-Type': 'application/json', 'X-ROSS-Session': sessionId },
+        body: JSON.stringify({ reason, session_id: sessionId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.detail || 'Failed to fetch replacements');
@@ -473,8 +484,8 @@
     const titleEl = document.getElementById('courseTitle');
     if (titleEl) titleEl.textContent = `Course details — ${newCourse}`;
 
-    // Close all popups
-    [whoOverlay, reasonsOverlay, courseOverlay, replacementOverlay].forEach(closeModal);
+  // Close only the replacement popup so the user sees the updated course details
+  closeModal(replacementOverlay);
   }
   }
 

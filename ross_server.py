@@ -120,6 +120,14 @@ def health() -> dict:
     return {"ok": True, "service": "ross-server", "version": "1.0.0"}
 
 
+
+# -----------------------------
+# Per-session schedule storage
+# -----------------------------
+import threading
+session_schedules = {}
+session_lock = threading.Lock()
+
 # -----------------------------
 # Core endpoint
 # -----------------------------
@@ -128,19 +136,33 @@ async def make_schedule(req: ScheduleRequest, request: Request) -> ScheduleRespo
     client = request.client.host if request.client else "unknown"
     log.info("POST /api from %s | majors=%s | courses=%s", client, req.majors, req.courses_taken)
 
-    # Fake id for now
-    schedule_id = "sched_" + str(abs(hash(tuple(req.majors) + tuple(req.courses_taken))))[:10]
+    # Get session_id from body or header
+    session_id = getattr(req, 'session_id', None) or request.headers.get('X-ROSS-Session')
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing session_id")
+
+    schedule_id = f"sched_{session_id[:10]}"
 
     schedule = ross_link.Schedule(req.majors, req.courses_taken)
     schedule.validate()
     semesters = schedule.get_courses()
     reasons = schedule.get_reasons()
 
+    # Store schedule by session
+    with session_lock:
+        session_schedules[session_id] = {
+            'majors': req.majors,
+            'courses_taken': req.courses_taken,
+            'semesters': semesters,
+            'reasons': reasons,
+            'schedule_id': schedule_id,
+        }
+
     return ScheduleResponse(
         message="Schedule sucessfully created!",
         majors=req.majors,
         courses_taken=req.courses_taken,
-        semesters=semesters,  # <-- key bit
+        semesters=semesters,
         reasons=reasons,
         schedule_id=schedule_id,
     )
