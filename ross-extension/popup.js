@@ -1,3 +1,125 @@
+// Scrape Timeline Courses button handler
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('runScraperBtn');
+      if (btn) {
+    btn.addEventListener('click', async () => {
+      // Inject content script to scrape the current tab
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+          chrome.tabs.executeScript(
+            tabs[0].id,
+            {
+              code: `Array.from(document.querySelectorAll('.dp-coursebubble-indentedtext')).map(b => {
+                let isNonTerm = false;
+                let el = b;
+                while (el) {
+                  if (el.classList && el.classList.contains('dp-nontermcourses')) {
+                    isNonTerm = true;
+                    break;
+                  }
+                  el = el.parentElement;
+                }
+                const bubble = b.closest('.dp-coursebubble');
+                return JSON.stringify({
+                  text: (bubble?.textContent.trim() || b.textContent.trim()),
+                  isNonTerm
+                });
+              })`
+            },
+            function(results) {
+              const modal = document.getElementById('scrapeModal');
+              const resultsDiv = document.getElementById('scrapeResults');
+              if (results && results[0] && results[0].length) {
+                // Extract course codes and credits, but avoid picking up the course number as credits
+                const codeRegex = /\b([a-z]{2,4})\s*-\s*([0-9]{3,4})\b/gi;
+                // Credits: look for (3), (3.0), 3 credits, 3.0 cr, etc., but not the course number
+                const creditRegexes = [
+                  /\((\d+(?:\.\d+)?)\)/i, // (3) or (3.0)
+                  /(?:credits?|cr)[:\s]*([0-9]+(?:\.[0-9]+)?)/i, // 'credits: 3', 'cr 3.0'
+                  /([0-9]+(?:\.[0-9]+)?)\s*(?:credits?|cr)/i // '3 credits', '3.0 cr'
+                ];
+                const found = [];
+                for (const raw of results[0]) {
+                  let obj;
+                  try { obj = JSON.parse(raw); } catch { continue; }
+                  const txt = obj.text.trim();
+                  const isNonTerm = obj.isNonTerm || /non[- ]?term/i.test(txt);
+                  // Only include courses with a letter grade, 'Completed', or 'Credit Earned', and exclude 'Planned', 'In Progress', 'Future', etc.
+                  const lower = txt.toLowerCase();
+                  // Exclude if any of these words are present
+                  if (/planned|in progress|future|not taken|not started|enrolled|register/i.test(lower)) continue;
+                  // Include if any of these are present
+                  if (!/completed|taken|credit( earned)?|grade[:]?|\b[a-df][+-]?\b|\bp\b|\bs\b/i.test(lower)) continue;
+                  let codeMatch;
+                  while ((codeMatch = codeRegex.exec(txt)) !== null) {
+                    const code = `${codeMatch[1].toUpperCase()}-${codeMatch[2]}`;
+                    // Remove the code from the string to avoid matching the course number
+                    let txtNoCode = txt.replace(codeMatch[0], '');
+                    let credits = null;
+                    if (/no credits or ceus/i.test(txt)) {
+                      credits = 'Placement';
+                    } else {
+                      for (const rx of creditRegexes) {
+                        const m = rx.exec(txtNoCode);
+                        if (m) {
+                          credits = m[1];
+                          break;
+                        }
+                      }
+                    }
+                    found.push({
+                      code,
+                      credits: credits || '?'
+                    });
+                  }
+                }
+                // Remove duplicates by code
+                const unique = [];
+                const seen = new Set();
+                for (const item of found) {
+                  if (!seen.has(item.code)) {
+                    seen.add(item.code);
+                    unique.push(item);
+                  }
+                }
+                if (unique.length) {
+                  // Build two lists: placement (no credits/CEUs) and for-credit
+                  const placementList = unique.filter(t => t.credits === 'Placement').map(t => t.code);
+                  const forCreditList = unique.filter(t => t.credits !== 'Placement' && t.credits !== '?').map(t => t.code);
+                  // For now, log both lists to the console
+                  console.log('Placement courses:', placementList);
+                  console.log('For-credit courses:', forCreditList);
+                  // Show both lists in the popup for user feedback
+                  resultsDiv.innerHTML =
+                    '<b>Placement (No Credits or CEUs):</b><br>' +
+                    (placementList.length ? '<ul style="padding-left:18px;">' + placementList.map(c => `<li>${c}</li>`).join('') + '</ul>' : '<i>None</i>') +
+                    '<br><b>For-credit courses:</b><br>' +
+                    (forCreditList.length ? '<ul style="padding-left:18px;">' + forCreditList.map(c => `<li>${c}</li>`).join('') + '</ul>' : '<i>None</i>');
+                } else {
+                  resultsDiv.textContent = 'No matching course codes found.';
+                }
+              } else {
+                resultsDiv.textContent = 'No course bubbles found or not on the correct page.';
+              }
+              modal.style.display = 'flex';
+            }
+          );
+        });
+      } else {
+        alert('This feature requires Chrome extension APIs.');
+      }
+    });
+  }
+
+  // Close scrape modal logic
+  const closeBtn = document.getElementById('closeScrapeModal');
+  const modal = document.getElementById('scrapeModal');
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
+});
 /* =========================
        LEFT: Autocomplete select
        ========================= */

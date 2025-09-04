@@ -16,7 +16,8 @@
   "permissions": [
     "http://127.0.0.1:8000/*",
     "http://localhost:8000/*",
-    "storage"
+    "storage",
+    "https://bc-coll-prodss.benedictine.edu/*"
   ],
   "background": { "scripts": ["background.js"] },
   "applications": { "gecko": { "id": "fastapi-talker@example.com" } }

@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 
 # -----------------------------
 # Logging
@@ -77,6 +77,30 @@ def serve_favicon() -> FileResponse:
     if not os.path.isfile(index_path):
         raise HTTPException(status_code=404, detail="static/favicon.ico not found")
     return FileResponse(index_path)
+
+# -----------------------------
+# Upload scraped course codes (placement and for-credit)
+# -----------------------------
+
+class UploadCoursesRequest(BaseModel):
+    placement: list[str] = Field(default_factory=list)
+    for_credit: list[str] = Field(default_factory=list)
+
+class UploadCoursesResponse(BaseModel):
+    placement: list[str]
+    for_credit: list[str]
+    message: str
+
+@app.post("/api/upload_courses", response_model=UploadCoursesResponse)
+async def upload_courses(req: UploadCoursesRequest) -> UploadCoursesResponse:
+
+    # Here you could save to a database, session, etc. For now, just echo back.
+    print(f"Placement: {req.placement}\nFor-credit: {req.for_credit}")
+    return UploadCoursesResponse(
+        placement=req.placement,
+        for_credit=req.for_credit,
+        message="Course lists received successfully."
+    )
 
 
 # -----------------------------

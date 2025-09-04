@@ -1,3 +1,4 @@
+  <!-- Scraped Results Modal (moved inside body) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,6 +21,7 @@
 
   <!-- CONTENT -->
   <main class="content">
+    <button id="runScraperBtn" class="cta" style="margin-bottom:16px;">Scrape Timeline Courses</button>
     <section class="grid">
       <!-- LEFT: Autocomplete picker -->
       <div class="card" aria-labelledby="left-title">
@@ -117,6 +119,17 @@
 
         <p class="muted">Questions or ideas part here?</p>
       </div>
+    </div>
+  </div>
+
+</main>
+
+  <!-- Scraped Results Modal (moved here) -->
+  <div id="scrapeModal" class="modal-overlay" style="display:none;">
+    <div class="modal" style="max-width:400px;">
+      <button id="closeScrapeModal" class="modal-close" aria-label="Close dialog">×</button>
+      <h2>Scraped Timeline Courses</h2>
+      <div id="scrapeResults" style="max-height:300px;overflow:auto;"></div>
     </div>
   </div>
 
