@@ -19,10 +19,35 @@ document.addEventListener('DOMContentLoaded', () => {
                   }
                   el = el.parentElement;
                 }
+                // Find the closest semester label (assume .dp-termheader or similar)
+                let semester = null;
+                let sEl = b;
+                while (sEl) {
+                  if (sEl.classList && sEl.classList.contains('dp-termheader')) {
+                    // Clean up the semester text to ensure no duplicates
+                    semester = sEl.textContent.trim().replace(/(\w+)\s+(\d{4}).*/, '$2 $1');
+                    break;
+                  }
+                  sEl = sEl.previousElementSibling;
+                }
+                // Fallback: look up the DOM tree for a parent with a semester label
+                if (!semester) {
+                  let p = b.parentElement;
+                  while (p) {
+                    const header = p.querySelector && p.querySelector('.dp-termheader');
+                    if (header) {
+                      // Clean up the semester text to ensure no duplicates
+                      semester = header.textContent.trim().replace(/(\w+)\s+(\d{4}).*/, '$2 $1');
+                      break;
+                    }
+                    p = p.parentElement;
+                  }
+                }
                 const bubble = b.closest('.dp-coursebubble');
                 return JSON.stringify({
                   text: (bubble?.textContent.trim() || b.textContent.trim()),
-                  isNonTerm
+                  isNonTerm,
+                  semester: semester || 'Non-term'
                 });
               })`
             },
@@ -38,22 +63,21 @@ document.addEventListener('DOMContentLoaded', () => {
                   /(?:credits?|cr)[:\s]*([0-9]+(?:\.[0-9]+)?)/i, // 'credits: 3', 'cr 3.0'
                   /([0-9]+(?:\.[0-9]+)?)\s*(?:credits?|cr)/i // '3 credits', '3.0 cr'
                 ];
+                // Group by semester
                 const found = [];
                 for (const raw of results[0]) {
                   let obj;
                   try { obj = JSON.parse(raw); } catch { continue; }
                   const txt = obj.text.trim();
                   const isNonTerm = obj.isNonTerm || /non[- ]?term/i.test(txt);
+                  const semester = obj.semester || 'Non-term';
                   // Only include courses with a letter grade, 'Completed', or 'Credit Earned', and exclude 'Planned', 'In Progress', 'Future', etc.
                   const lower = txt.toLowerCase();
-                  // Exclude if any of these words are present
                   if (/planned|in progress|future|not taken|not started|enrolled|register/i.test(lower)) continue;
-                  // Include if any of these are present
                   if (!/completed|taken|credit( earned)?|grade[:]?|\b[a-df][+-]?\b|\bp\b|\bs\b/i.test(lower)) continue;
                   let codeMatch;
                   while ((codeMatch = codeRegex.exec(txt)) !== null) {
                     const code = `${codeMatch[1].toUpperCase()}-${codeMatch[2]}`;
-                    // Remove the code from the string to avoid matching the course number
                     let txtNoCode = txt.replace(codeMatch[0], '');
                     let credits = null;
                     if (/no credits or ceus/i.test(txt)) {
@@ -69,35 +93,92 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     found.push({
                       code,
-                      credits: credits || '?'
+                      credits: credits || '?',
+                      semester
                     });
                   }
                 }
-                // Remove duplicates by code
-                const unique = [];
-                const seen = new Set();
+                // Remove duplicates by code+semester
+                // Function to clean and standardize semester names
+                function cleanSemesterName(rawSemester) {
+                    if (!rawSemester || /non[-]?term/i.test(rawSemester)) return 'Non-term';
+                    
+                    // Split into words and filter out empty/whitespace
+                    const words = rawSemester.split(/\s+/).filter(w => w.trim());
+                    
+                    let year = null;
+                    let season = null;
+                    
+                    // Find year and season
+                    for (const word of words) {
+                        if (/^\d{4}$/.test(word)) {
+                            year = word;
+                        } else if (/^(Spring|Summer|Fall|Winter)$/i.test(word)) {
+                            season = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+                        }
+                    }
+                    
+                    if (!year || !season) return rawSemester.trim(); // Fallback if parsing fails
+                    return `${year} ${season}`;
+                }
+                
+                // First, create a Map to store unique courses by semester
+                const semesterMap = new Map();
+                
                 for (const item of found) {
-                  if (!seen.has(item.code)) {
-                    seen.add(item.code);
-                    unique.push(item);
-                  }
+                    const semester = cleanSemesterName(item.semester);
+                    
+                    // Create semester entry if it doesn't exist
+                    if (!semesterMap.has(semester)) {
+                        semesterMap.set(semester, new Map());
+                    }
+                    
+                    // Store course using code as key to prevent duplicates
+                    const courseKey = item.code;
+                    semesterMap.get(semester).set(courseKey, [
+                        item.code.split('-')[0],
+                        item.code.split('-')[1],
+                        item.credits
+                    ]);
                 }
-                if (unique.length) {
-                  // Build two lists: placement (no credits/CEUs) and for-credit
-                  const placementList = unique.filter(t => t.credits === 'Placement').map(t => t.code);
-                  const forCreditList = unique.filter(t => t.credits !== 'Placement' && t.credits !== '?').map(t => t.code);
-                  // For now, log both lists to the console
-                  console.log('Placement courses:', placementList);
-                  console.log('For-credit courses:', forCreditList);
-                  // Show both lists in the popup for user feedback
-                  resultsDiv.innerHTML =
-                    '<b>Placement (No Credits or CEUs):</b><br>' +
-                    (placementList.length ? '<ul style="padding-left:18px;">' + placementList.map(c => `<li>${c}</li>`).join('') + '</ul>' : '<i>None</i>') +
-                    '<br><b>For-credit courses:</b><br>' +
-                    (forCreditList.length ? '<ul style="padding-left:18px;">' + forCreditList.map(c => `<li>${c}</li>`).join('') + '</ul>' : '<i>None</i>');
-                } else {
-                  resultsDiv.textContent = 'No matching course codes found.';
+                
+                // Convert to sorted array of [semester, courses]
+                const sortedSemesters = Array.from(semesterMap.entries()).sort(([a], [b]) => {
+                    if (a === 'Non-term') return -1;
+                    if (b === 'Non-term') return 1;
+                    // Parse years and seasons for comparison
+                    const [yearA, seasonA] = a.split(' ');
+                    const [yearB, seasonB] = b.split(' ');
+                    // Compare years first
+                    if (yearA !== yearB) return yearA.localeCompare(yearB);
+                    // Within same year, sort seasons
+                    const seasons = { 'Spring': 0, 'Summer': 1, 'Fall': 2 };
+                    return seasons[seasonA] - seasons[seasonB];
+                });
+
+                // Store the sorted data for debug view
+                window.debugData = {
+                    rawMap: Object.fromEntries(semesterMap),
+                    sortedOrder: sortedSemesters.map(([sem]) => sem),
+                    detailedListing: sortedSemesters.map(([semester, coursesMap]) => ({
+                        semester,
+                        courses: Array.from(coursesMap.values()).map(course => 
+                            `${course[0]}-${course[1]} (${course[2]} credits)`
+                        )
+                    }))
+                };
+                let html = '';
+                
+                for (const [semester, coursesMap] of sortedSemesters) {
+                    const courses = Array.from(coursesMap.values());
+                    if (courses.length > 0) {
+                        html += `<h3 style="margin-bottom: 8px;">${semester}</h3>`;
+                        html += '<ul style="padding-left:18px;margin-top:4px;">';
+                        html += courses.map(r => `<li>${r[0]}-${r[1]} (${r[2]} credits)</li>`).join('');
+                        html += '</ul>';
+                    }
                 }
+                resultsDiv.innerHTML = html || '<i>No matching course codes found.</i>';
               } else {
                 resultsDiv.textContent = 'No course bubbles found or not on the correct page.';
               }
@@ -117,6 +198,88 @@ document.addEventListener('DOMContentLoaded', () => {
   if (closeBtn && modal) {
     closeBtn.addEventListener('click', () => {
       modal.style.display = 'none';
+    });
+  }
+
+  // Debug modal logic
+  const debugBtn = document.getElementById('showDebugBtn');
+  const debugModal = document.getElementById('debugModal');
+  const closeDebugBtn = document.getElementById('closeDebugModal');
+  const debugInfo = document.getElementById('debugInfo');
+
+  if (debugBtn && debugModal && closeDebugBtn) {
+    debugBtn.addEventListener('click', () => {
+      if (window.debugData) {
+        // Organize courses by semester
+        const semesterCourses = {};
+        const noCreditCourses = {};
+
+        // Counter for semester numbering
+        let semesterCount = 1;
+        const semesterNumbers = new Map();
+
+        // First, assign numbers to semesters in chronological order
+        window.debugData.sortedOrder.forEach(sem => {
+          if (sem !== 'Non-term') {
+            semesterNumbers.set(sem, semesterCount++);
+          }
+        });
+
+        window.debugData.detailedListing.forEach(({ semester, courses }) => {
+          courses.forEach(course => {
+            const match = course.match(/([A-Z]+)-(\d+)\s+\((.+?)\)/);
+            if (match) {
+              const [_, dept, num, credits] = match;
+              const courseEntry = [dept, parseInt(num)];
+              
+              if (semester === 'Non-term' || credits === 'Placement' || credits === '?') {
+                if (!noCreditCourses['non-term']) {
+                  noCreditCourses['non-term'] = [];
+                }
+                noCreditCourses['non-term'].push(courseEntry);
+              } else {
+                const semKey = `semester-${semesterNumbers.get(semester)}`;
+                if (!semesterCourses[semKey]) {
+                  semesterCourses[semKey] = [];
+                }
+                semesterCourses[semKey].push(courseEntry);
+              }
+            }
+          });
+        });
+
+        // Format output to match the exact structure requested
+        let output = 'Courses with Credits:\n{\n';
+        Object.entries(semesterCourses)
+          .sort(([a], [b]) => {
+            // Extract numbers and compare
+            const numA = parseInt(a.split('-')[1]);
+            const numB = parseInt(b.split('-')[1]);
+            return numA - numB;
+          })
+          .forEach(([semester, courses]) => {
+            output += `    "${semester}": ${JSON.stringify(courses.map(course => course.join('-')))},\n`;
+          });
+        output = output.slice(0, -2); // Remove last comma
+        output += '\n}\n\n';
+
+        output += 'Courses without Credits:\n{\n';
+        Object.entries(noCreditCourses).forEach(([semester, courses]) => {
+          output += `    "${semester}": ${JSON.stringify(courses.map(course => course.join('-')))},\n`;
+        });
+        output = output.slice(0, -2); // Remove last comma
+        output += '\n}';
+        
+        debugInfo.textContent = output;
+        debugModal.style.display = 'flex';
+      } else {
+        debugInfo.textContent = 'No data available. Please run the scraper first.';
+        debugModal.style.display = 'flex';
+      }
+    });
+
+    closeDebugBtn.addEventListener('click', () => {
+      debugModal.style.display = 'none';
     });
   }
 });

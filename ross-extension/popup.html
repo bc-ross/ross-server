@@ -1,3 +1,14 @@
+  <!-- Debug Modal -->
+  <div id="debugModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Debug Information</h2>
+        <button id="closeDebugModal" class="close-btn">&times;</button>
+      </div>
+      <div id="debugInfo" style="white-space:pre-wrap;font-family:monospace;"></div>
+    </div>
+  </div>
+  
   <!-- Scraped Results Modal (moved inside body) -->
 <!DOCTYPE html>
 <html lang="en">
@@ -21,7 +32,10 @@
 
   <!-- CONTENT -->
   <main class="content">
-    <button id="runScraperBtn" class="cta" style="margin-bottom:16px;">Scrape Timeline Courses</button>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button id="runScraperBtn" class="cta">Scrape Timeline Courses</button>
+      <button id="showDebugBtn" class="ghost-btn">Show Debug Info</button>
+    </div>
     <section class="grid">
       <!-- LEFT: Autocomplete picker -->
       <div class="card" aria-labelledby="left-title">
