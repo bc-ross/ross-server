@@ -20,7 +20,7 @@ body{
   margin:0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Helvetica Neue", sans-serif;
   color: var(--text);
-  background: radial-gradient(1200px 600px at 50% -200px, #152232 0%, #0b0f14 60%);
+  background: radial-gradient(1200px 600px at 50% -50px, #000000 0%, #600202 60%);
   background-attachment: fixed;
 }
 
@@ -35,7 +35,7 @@ body{
   letter-spacing: 0.06em;
   line-height: .85;
   font-weight: 900;
-  background: linear-gradient(180deg, #fff 0%, #b9c6d9 80%);
+  background: linear-gradient(180deg, #fff 0%, #a7bedf 80%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
