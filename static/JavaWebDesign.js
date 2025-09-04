@@ -466,15 +466,14 @@
     if (selectedRow) {
       const tdCourse = selectedRow.querySelector('td');
       if (tdCourse) tdCourse.textContent = newCourse;
-      selectedRow.classList.remove('selected');
+      // Do NOT remove 'selected' class so popup stays open and updates
     }
-    // Also update the course details popup
+    // Update the course details popup content only (do not close)
     if (cdCourse) cdCourse.textContent = newCourse;
     const titleEl = document.getElementById('courseTitle');
     if (titleEl) titleEl.textContent = `Course details — ${newCourse}`;
-
-    // Close all popups
-    [whoOverlay, reasonsOverlay, courseOverlay, replacementOverlay].forEach(closeModal);
+    // Only close the replacement popup, not the course details popup
+    closeModal(replacementOverlay);
   }
   }
 
