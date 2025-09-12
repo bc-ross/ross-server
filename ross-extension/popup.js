@@ -1,3 +1,51 @@
+// Generate schedule from semesterCourses and noCreditCourses
+function generateSchedule() {
+  // This function assumes semesterCourses and noCreditCourses are available in scope
+  // Returns a list of dictionaries, one per semester, with courses
+  const schedule = [];
+  if (typeof window.debugData === 'object' && window.debugData.sortedOrder) {
+    // Reconstruct semesterCourses and noCreditCourses
+    const semesterCourses = {};
+    const noCreditCourses = {};
+    let semesterCount = 1;
+    let summerCount = 1;
+    const semesterNumbers = new Map();
+    window.debugData.sortedOrder.forEach(sem => {
+      if (sem !== 'Non-term') {
+        if (/Summer/i.test(sem)) {
+          semesterNumbers.set(sem, `summer-${summerCount++}`);
+        } else {
+          semesterNumbers.set(sem, `semester-${semesterCount++}`);
+        }
+      }
+    });
+    window.debugData.detailedListing.forEach(({ semester, courses }) => {
+      courses.forEach(course => {
+        const match = course.match(/([A-Z]+)-(\d+) \((.+?) credits\)/);
+        if (match) {
+          const [_, dept, num, credits] = match;
+          const courseEntry = { dept, num: parseInt(num), credits };
+          if (/Non-term/i.test(semester) || credits === 'Placement' || credits === '?') {
+            if (!noCreditCourses['non-term']) noCreditCourses['non-term'] = [];
+            noCreditCourses['non-term'].push(courseEntry);
+          } else {
+            const semKey = semesterNumbers.get(semester);
+            if (!semesterCourses[semKey]) semesterCourses[semKey] = [];
+            semesterCourses[semKey].push(courseEntry);
+          }
+        }
+      });
+    });
+    // Build schedule list of dicts
+    Object.entries(semesterCourses).forEach(([semKey, courses]) => {
+      schedule.push({ semester: semKey, courses });
+    });
+    Object.entries(noCreditCourses).forEach(([semKey, courses]) => {
+      schedule.push({ semester: semKey, courses });
+    });
+  }
+  return schedule;
+}
 // Scrape Timeline Courses button handler
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('runScraperBtn');
@@ -71,10 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   const txt = obj.text.trim();
                   const isNonTerm = obj.isNonTerm || /non[- ]?term/i.test(txt);
                   const semester = obj.semester || 'Non-term';
-                  // Only include courses with a letter grade, 'Completed', or 'Credit Earned', and exclude 'Planned', 'In Progress', 'Future', etc.
-                  const lower = txt.toLowerCase();
-                  if (/planned|in progress|future|not taken|not started|enrolled|register/i.test(lower)) continue;
-                  if (!/completed|taken|credit( earned)?|grade[:]?|\b[a-df][+-]?\b|\bp\b|\bs\b/i.test(lower)) continue;
+                  // Allow all courses, including planned/future ones, to be scraped and shown
                   let codeMatch;
                   while ((codeMatch = codeRegex.exec(txt)) !== null) {
                     const code = `${codeMatch[1].toUpperCase()}-${codeMatch[2]}`;
@@ -201,20 +246,118 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 
                 // Generate HTML for display
-                let html = '';
-                for (const [semester, coursesMap] of sortedSemesters) {
-                    const courses = Array.from(coursesMap.values());
-                    if (courses.length > 0) {
-                        html += `<h3 style="margin-bottom: 8px;">${semester}</h3>`;
-                        html += '<ul style="padding-left:18px;margin-top:4px;">';
-                        html += courses.map(r => {
-                            const courseNum = String(r[1]).padStart(4, '0');
-                            return `<li>${r[0]}-${courseNum} (${r[2]} credits)</li>`;
-                        }).join('');
-                        html += '</ul>';
+                  let html = '';
+                  let futureHtml = '';
+                  let hasFuture = false;
+                  // Get current date for future detection
+                  const now = new Date();
+                  const currentYear = now.getFullYear();
+                  const currentMonth = now.getMonth();
+                  // For semester ordering
+                  const seasonOrder = { 'Spring': 1, 'Summer': 2, 'Fall': 3, 'Winter': 4 };
+                  for (const [semester, coursesMap] of sortedSemesters) {
+                      const courses = Array.from(coursesMap.values());
+                      if (courses.length > 0) {
+                          // Detect if semester is in the future
+                          let isFuture = false;
+                          if (semester !== 'Non-term') {
+                            const [year, season] = semester.split(' ');
+                            // If year is greater than current year, always future
+                            if (parseInt(year) > currentYear) {
+                              isFuture = true;
+                            } else if (parseInt(year) === currentYear) {
+                              // If same year, check if season is after current season
+                              // Map current month to season
+                              let currentSeason = 'Spring';
+                              if (currentMonth >= 0 && currentMonth <= 3) currentSeason = 'Spring';
+                              else if (currentMonth >= 4 && currentMonth <= 6) currentSeason = 'Summer';
+                              else if (currentMonth >= 7 && currentMonth <= 10) currentSeason = 'Fall';
+                              else currentSeason = 'Winter';
+                              if (seasonOrder[season] > seasonOrder[currentSeason]) {
+                                isFuture = true;
+                              }
+                            }
+                          }
+                          const sectionHtml = `<h3 style="margin-bottom: 8px;">${semester}</h3>` +
+                            '<ul style="padding-left:18px;margin-top:4px;">' +
+                            courses.map(r => {
+                              const courseNum = String(r[1]).padStart(4, '0');
+                              return `<li>${r[0]}-${courseNum} (${r[2]} credits)</li>`;
+                            }).join('') +
+                            '</ul>';
+                          if (isFuture) {
+                            futureHtml += sectionHtml;
+                            hasFuture = true;
+                          } else {
+                            html += sectionHtml;
+                          }
+                      }
+                  }
+                  const addFutureCoursesWrap = document.getElementById('addFutureCoursesWrap');
+                  const addFutureCoursesBtn = document.getElementById('addFutureCoursesBtn');
+                  if (hasFuture) {
+                    resultsDiv.innerHTML = (html ? `<h2>Completed/Current Semesters</h2>${html}` : '') + `<h2 style='color:#d48806;'>Future Semesters</h2>${futureHtml}`;
+                    if (addFutureCoursesWrap) addFutureCoursesWrap.style.display = 'block';
+                    // Store future courses for button handler
+                    window._futureCoursesToAdd = [];
+                    for (const [semester, coursesMap] of sortedSemesters) {
+                      if (semester !== 'Non-term') {
+                        const [year, season] = semester.split(' ');
+                        let isFuture = false;
+                        if (parseInt(year) > currentYear) isFuture = true;
+                        else if (parseInt(year) === currentYear) {
+                          let currentSeason = 'Spring';
+                          if (currentMonth >= 0 && currentMonth <= 3) currentSeason = 'Spring';
+                          else if (currentMonth >= 4 && currentMonth <= 6) currentSeason = 'Summer';
+                          else if (currentMonth >= 7 && currentMonth <= 10) currentSeason = 'Fall';
+                          else currentSeason = 'Winter';
+                          if (seasonOrder[season] > seasonOrder[currentSeason]) isFuture = true;
+                        }
+                        if (isFuture) {
+                          for (const course of coursesMap.values()) {
+                            window._futureCoursesToAdd.push({
+                              code: `${course[0]}-${String(course[1]).padStart(4, '0')}`,
+                              credits: course[2],
+                              semester
+                            });
+                          }
+                        }
+                      }
                     }
-                }
-                resultsDiv.innerHTML = html || '<i>No matching course codes found.</i>';
+                    if (addFutureCoursesBtn) {
+                      addFutureCoursesBtn.onclick = function() {
+                        const takenList = document.getElementById('takenList');
+                        const takenItems = new Set(Array.from(takenList.children).map(li => li.textContent.replace('×', '').trim()));
+                        let addedCount = 0;
+                        window._futureCoursesToAdd.forEach(course => {
+                          if (!takenItems.has(course.code)) {
+                            const li = document.createElement('li');
+                            li.className = 'chip';
+                            li.textContent = course.code;
+                            const btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.setAttribute('aria-label', 'Remove');
+                            btn.textContent = '×';
+                            btn.addEventListener('click', () => {
+                              takenItems.delete(course.code);
+                              takenList.removeChild(li);
+                              saveTaken();
+                            });
+                            li.appendChild(btn);
+                            takenList.appendChild(li);
+                            takenItems.add(course.code);
+                            addedCount++;
+                          }
+                        });
+                        saveTaken();
+                        addFutureCoursesWrap.style.display = 'none';
+                        alert(`Added future courses to your semester list.`);
+                      };
+                    }
+                  } else {
+                    resultsDiv.innerHTML = html || '<i>No matching course codes found.</i>';
+                    if (addFutureCoursesWrap) addFutureCoursesWrap.style.display = 'none';
+                  }
               } else {
                 resultsDiv.textContent = 'No course bubbles found or not on the correct page.';
               }
@@ -293,12 +436,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Counter for semester numbering
         let semesterCount = 1;
+        let summerCount = 1;
         const semesterNumbers = new Map();
 
         // First, assign numbers to semesters in chronological order
         window.debugData.sortedOrder.forEach(sem => {
           if (sem !== 'Non-term') {
-            semesterNumbers.set(sem, semesterCount++);
+            if (/Summer/i.test(sem)) {
+              semesterNumbers.set(sem, `summer-${summerCount++}`);
+            } else {
+              semesterNumbers.set(sem, `semester-${semesterCount++}`);
+            }
           }
         });
 
@@ -315,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 noCreditCourses['non-term'].push(courseEntry);
               } else {
-                const semKey = `semester-${semesterNumbers.get(semester)}`;
+                const semKey = semesterNumbers.get(semester);
                 if (!semesterCourses[semKey]) {
                   semesterCourses[semKey] = [];
                 }
