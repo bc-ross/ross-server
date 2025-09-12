@@ -49,17 +49,21 @@ body{
   letter-spacing:.02em;
 }
 .hero-actions { margin-top: 10px; }
-.ghost-btn{
-  background: transparent;
-  border: 1.5px solid #7fa0c6;
-  color: #e9eef5;
+
+/* Who We Are button custom style */
+#openWho.ghost-btn {
+  background: linear-gradient(180deg, #fff 0%, #a7bedf 80%);
+  color: #000;
+  border: none;
   padding: 8px 14px;
   border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
-  transition: background .15s ease, color .15s ease, border-color .15s;
+  transition: background .15s, color .15s;
 }
-.ghost-btn:hover{ background:#152232; border-color:#b9c6d9; }
+#openWho.ghost-btn:hover {
+  transform: translateY(-4px);
+}
 
 /* Content */
 .content{
@@ -182,17 +186,17 @@ body{
   padding: 26px 0;
   font-size: clamp(22px, 3vw, 38px);
   font-weight: 800;
-  border: 2px solid #fff;
+  border: none;
   border-radius: 14px;
-  background:#fff;
-  color:#000;
+  background: linear-gradient(180deg, #fff 0%, #a7bedf 80%);
+  color: #000;
   letter-spacing:.03em;
   cursor:pointer;
-  transition: transform .08s ease, background .15s ease, color .15s ease, border-color .15s ease;
+  transition: transform .08s ease, background .15s ease, color .15s ease;
   user-select:none;
 }
 .cta:hover{
-  background:#000; color:#fff; border-color:#000;
+  transform: translateY(-4px);
 }
 .cta:disabled{ opacity:.6; cursor: not-allowed; }
 
@@ -307,6 +311,7 @@ body{
   padding: 8px 10px; border-top: 1px dashed var(--line); color:#9fb0c7; font-size:12px;
   white-space: nowrap;
 }
+
 
 /* === Requirements tables === */
 .table-scroller{

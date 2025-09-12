@@ -388,7 +388,25 @@
       findBtn.id = 'findReplacementBtn';
       findBtn.textContent = 'Find Replacement';
       findBtn.className = 'btn';
-      findBtn.style.marginTop = '12px';
+      findBtn.style.backgroundColor = '#3498db'; // blueish
+      findBtn.style.color = '#fff';
+      findBtn.style.border = 'none';
+      findBtn.style.borderRadius = '20px'; // rounded
+      findBtn.style.padding = '10px 20px';
+      findBtn.style.fontWeight = 'bold';
+      findBtn.style.cursor = 'pointer';
+      findBtn.style.transition = 'background 0.2s';
+      // Hover effect: clear background
+      findBtn.addEventListener('mouseenter', function() {
+        findBtn.style.backgroundColor = 'transparent';
+        findBtn.style.color = '#3498db';
+        findBtn.style.border = '2px solid #3498db';
+      });
+      findBtn.addEventListener('mouseleave', function() {
+        findBtn.style.backgroundColor = '#3498db';
+        findBtn.style.color = '#fff';
+        findBtn.style.border = 'none';
+      });
       cdTableWrap?.appendChild(findBtn);
     }
     findBtn.onclick = () => openReplacementPopup(courseKey, foundations, skills);
