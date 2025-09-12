@@ -1,7 +1,7 @@
 // Scrape Timeline Courses button handler
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('runScraperBtn');
-      if (btn) {
+  if (btn) {
     btn.addEventListener('click', async () => {
       // Inject content script to scrape the current tab
       if (typeof chrome !== 'undefined' && chrome.tabs) {
@@ -156,9 +156,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     return seasons[seasonA] - seasons[seasonB];
                 });
 
-                // Store the sorted data for debug view
+                // Add courses directly to taken list
+                const takenList = document.getElementById("takenList");
+                
+                for (const [semester, coursesMap] of sortedSemesters) {
+                    const courses = Array.from(coursesMap.values());
+                    courses.forEach(course => {
+                        // Format course number to be 4 digits
+                        const courseNum = String(course[1]).padStart(4, '0');
+                        const courseCode = `${course[0]}-${courseNum}`;
+                        if (!takenItems.has(courseCode)) {
+                            takenItems.add(courseCode);
+                            
+                            const li = document.createElement("li");
+                            li.className = "chip";
+                            li.textContent = courseCode;
+                            
+                            const btn = document.createElement("button");
+                            btn.type = "button";
+                            btn.setAttribute("aria-label", "Remove");
+                            btn.textContent = "×";
+                            btn.addEventListener("click", () => {
+                                takenItems.delete(courseCode);
+                                takenList.removeChild(li);
+                                saveTaken();
+                            });
+                            
+                            li.appendChild(btn);
+                            takenList.appendChild(li);
+                        }
+                    });
+                }
+                saveTaken();
+                
+                // Store debug data
                 window.debugData = {
-                    rawMap: Object.fromEntries(semesterMap),
                     sortedOrder: sortedSemesters.map(([sem]) => sem),
                     detailedListing: sortedSemesters.map(([semester, coursesMap]) => ({
                         semester,
@@ -167,14 +199,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         )
                     }))
                 };
-                let html = '';
                 
+                // Generate HTML for display
+                let html = '';
                 for (const [semester, coursesMap] of sortedSemesters) {
                     const courses = Array.from(coursesMap.values());
                     if (courses.length > 0) {
                         html += `<h3 style="margin-bottom: 8px;">${semester}</h3>`;
                         html += '<ul style="padding-left:18px;margin-top:4px;">';
-                        html += courses.map(r => `<li>${r[0]}-${r[1]} (${r[2]} credits)</li>`).join('');
+                        html += courses.map(r => {
+                            const courseNum = String(r[1]).padStart(4, '0');
+                            return `<li>${r[0]}-${courseNum} (${r[2]} credits)</li>`;
+                        }).join('');
                         html += '</ul>';
                     }
                 }
@@ -198,6 +234,47 @@ document.addEventListener('DOMContentLoaded', () => {
   if (closeBtn && modal) {
     closeBtn.addEventListener('click', () => {
       modal.style.display = 'none';
+    });
+  }
+
+  // Import scraped courses functionality
+  const importBtn = document.getElementById('importScrapedBtn');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => {
+      if (!window.scrapedCourses) {
+        alert('Please scrape your timeline first using the "Scrape Timeline Courses" button.');
+        return;
+      }
+
+      const takenList = document.getElementById('takenList');
+      const existingCourses = new Set(
+        Array.from(takenList.children).map(li => li.textContent.replace('×', '').trim())
+      );
+
+      let addedCount = 0;
+      window.scrapedCourses.detailedListing.forEach(({ courses }) => {
+        courses.forEach(course => {
+          const courseCode = `${course.dept}-${course.num}`;
+          if (!existingCourses.has(courseCode)) {
+            const li = document.createElement('li');
+            li.className = 'chip';
+            li.textContent = courseCode;
+            
+            // Add remove button
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove';
+            removeBtn.textContent = '×';
+            removeBtn.addEventListener('click', () => li.remove());
+            
+            li.appendChild(removeBtn);
+            takenList.appendChild(li);
+            existingCourses.add(courseCode);
+            addedCount++;
+          }
+        });
+      });
+
+      alert(`Added ${addedCount} new courses to your taken list.`);
     });
   }
 
