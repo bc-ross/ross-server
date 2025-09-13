@@ -102,6 +102,68 @@ async def upload_courses(req: UploadCoursesRequest) -> UploadCoursesResponse:
         message="Course lists received successfully."
     )
 
+# -----------------------------
+# Debug endpoint for extension
+# -----------------------------
+# This will print and return the lists for debugging
+from fastapi import Query
+
+@app.get("/api/debug_info")
+async def get_debug_info(
+    placement: list[str] = Query(default=[]),
+    for_credit: list[str] = Query(default=[]),
+    sorted_order: list[str] = Query(default=[]),
+    detailed_listing: list[str] = Query(default=[])
+):
+    import re, json
+    semester_courses = {}
+    no_credit_courses = {}
+    semester_count = 1
+    summer_count = 1
+    semester_numbers = {}
+    # Assign numbers to semesters in chronological order
+    for sem in sorted_order:
+        if sem != 'Non-term':
+            if re.search(r'Summer', sem, re.I):
+                semester_numbers[sem] = f"summer-{summer_count}"
+                summer_count += 1
+            else:
+                semester_numbers[sem] = f"semester-{semester_count}"
+                semester_count += 1
+    # Parse detailed_listing: expects list of JSON strings
+    for entry in detailed_listing:
+        try:
+            obj = json.loads(entry)
+        except Exception:
+            continue
+        semester = obj.get('semester', 'Non-term')
+        courses = obj.get('courses', []) if isinstance(obj.get('courses', None), list) else [obj.get('text', '')]
+        for course in courses:
+            match = re.match(r'([A-Z]+)-(\d+)\s+\((.+?)\)', course)
+            if match:
+                dept, num, credits = match.groups()
+                course_entry = f"{dept}-{int(num)}"
+                if semester == 'Non-term' or credits == 'Placement' or credits == '?':
+                    no_credit_courses.setdefault('non-term', []).append(course_entry)
+                else:
+                    sem_key = semester_numbers.get(semester)
+                    if sem_key:
+                        semester_courses.setdefault(sem_key, []).append(course_entry)
+    # Format output
+    output = 'Courses with Credits:\n{\n'
+    sorted_semesters = sorted(semester_courses.items(), key=lambda x: int(x[0].split('-')[1]))
+    for semester, courses in sorted_semesters:
+        output += f'    "{semester}": {json.dumps(courses)},\n'
+    # Append 'Courses without Credits' to the end of the main list
+    for semester, courses in no_credit_courses.items():
+        output += f'    "{semester}": {json.dumps(courses)},\n'
+    if sorted_semesters or no_credit_courses:
+        output = output[:-2]  # Remove last comma
+    output += '\n}'
+    print("\n================ DEBUG INFO ================\n")
+    print(output)
+    print("\n============================================\n")
+    return {"placement": placement, "for_credit": for_credit}
 
 # -----------------------------
 # Models

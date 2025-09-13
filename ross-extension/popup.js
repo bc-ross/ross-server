@@ -428,18 +428,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const debugInfo = document.getElementById('debugInfo');
 
   if (debugBtn && debugModal && closeDebugBtn) {
-    debugBtn.addEventListener('click', () => {
+    debugBtn.addEventListener('click', async () => {
       if (window.debugData) {
-        // Organize courses by semester
+        // Prepare query parameters for backend
+        const params = new URLSearchParams();
+        (window.debugData.placement || []).forEach(p => params.append('placement', p));
+        (window.debugData.for_credit || []).forEach(f => params.append('for_credit', f));
+        (window.debugData.sortedOrder || []).forEach(s => params.append('sorted_order', s));
+        (window.debugData.detailedListing || []).forEach(obj => params.append('detailed_listing', JSON.stringify(obj)));
+
+        // Call the correct API endpoint
+        try {
+          await fetch(`http://127.0.0.1:8000/api/debug_info?${params.toString()}`);
+        } catch (err) {
+          console.error('Failed to call debug_info API:', err);
+        }
+
+        // Local modal logic (unchanged)
         const semesterCourses = {};
         const noCreditCourses = {};
-
-        // Counter for semester numbering
         let semesterCount = 1;
         let summerCount = 1;
         const semesterNumbers = new Map();
-
-        // First, assign numbers to semesters in chronological order
         window.debugData.sortedOrder.forEach(sem => {
           if (sem !== 'Non-term') {
             if (/Summer/i.test(sem)) {
@@ -449,14 +459,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           }
         });
-
         window.debugData.detailedListing.forEach(({ semester, courses }) => {
           courses.forEach(course => {
             const match = course.match(/([A-Z]+)-(\d+)\s+\((.+?)\)/);
             if (match) {
               const [_, dept, num, credits] = match;
               const courseEntry = [dept, parseInt(num)];
-              
               if (semester === 'Non-term' || credits === 'Placement' || credits === '?') {
                 if (!noCreditCourses['non-term']) {
                   noCreditCourses['non-term'] = [];
@@ -472,12 +480,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           });
         });
-
-        // Format output to match the exact structure requested
         let output = 'Courses with Credits:\n{\n';
         Object.entries(semesterCourses)
           .sort(([a], [b]) => {
-            // Extract numbers and compare
             const numA = parseInt(a.split('-')[1]);
             const numB = parseInt(b.split('-')[1]);
             return numA - numB;
@@ -485,16 +490,14 @@ document.addEventListener('DOMContentLoaded', () => {
           .forEach(([semester, courses]) => {
             output += `    "${semester}": ${JSON.stringify(courses.map(course => course.join('-')))},\n`;
           });
-        output = output.slice(0, -2); // Remove last comma
+        output = output.slice(0, -2);
         output += '\n}\n\n';
-
         output += 'Courses without Credits:\n{\n';
         Object.entries(noCreditCourses).forEach(([semester, courses]) => {
           output += `    "${semester}": ${JSON.stringify(courses.map(course => course.join('-')))},\n`;
         });
-        output = output.slice(0, -2); // Remove last comma
+        output = output.slice(0, -2);
         output += '\n}';
-        
         debugInfo.textContent = output;
         debugModal.style.display = 'flex';
       } else {
